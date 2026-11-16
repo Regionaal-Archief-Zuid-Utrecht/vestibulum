@@ -89,6 +89,8 @@ Een ander gebruiksgeval in deze categorie is waarbij medewerkers vanuit een aang
 
 (NB: is de toegang dan per gemeente of zijn ook andere selecties nodig? Bijvoorbeeld toegang tot alle documenten van een bepaald type (ongeachte archiefvormer?), of toegang tot alle documenten ongeacht vorm of type?)
 
+Een verleende toegang is altijd scope-specifiek: zij geldt uitsluitend voor de documenten of dossiers waarvoor zij is verleend. Binnen zo'n scope kunnen documenten met een andere basiscategorie (1 of 2) vallen; voor de bevoegde actor geldt dan de toegang zoals die via categorie 3 is verleend — instemming of studiezaalbezoek is daarvoor niet vereist.
+
 ###### Actoren en toegangsmatrix
 
 Bij de categorieën spelen de volgende actoren een rol:

@@ -46,10 +46,10 @@ De architectuur volgt de rolverdeling uit de XACML-referentiearchitectuur (die N
 - **Autorisatieregister** — de administratie van verleende `granted`-toegangen (tijdelijk dan wel functiegebonden; zie A.5). Gevuld door beheerprocessen (archivaris, deelnemende organisaties), gelezen door de sessie-/autorisatievoorziening, door niemand anders gemuteerd. De administratie zelf is buiten scope (requirements §1.2.4); architectonisch is het een register met records: gebruiker → scope + geldigheid + verleend door.
 - **Attribuutbronnen (PIP-rol)** — de bron van waarheid voor de categorie en einddatum per document blijft de RDF-sidecar, maar op de request-path bevraagt de resolver deze niet direct via SPARQL. In plaats daarvan wordt per document een attributenrecord **gematerialiseerd in een snelle attributenstore**: een eenvoudige database of een per-document entry in de bestaande Elasticsearch-index. De store wordt gevoed door het inname- en herclassificatieproces (§4). Een attributenrecord bevat minimaal:
   - de persistente **URI** van het document (sleutel),
-  - de **basiscategorie** en de **einddatum** van de beperking,
+  - de **basiscategorie** van het document. De **einddatum** van de beperking is voor het besluit zelf niet nodig (de resolver beslist uitsluitend op de actuele categorie), maar wordt wel in het record mee-genoteerd: het periodieke herclassificatieproces (§4) kan daarmee eenvoudig geautomatiseerd jaarlijks bepalen welke categorieën moeten worden bijgewerkt, zonder alle sidecars opnieuw te hoeven doorrekenen,
   - de **dossier-URI** waar het document toe behoort (voor de scope-checks bij `consented` en `granted`),
   - de **archiefvormer / eigenaar** van het document (en eventueel het **documenttype**). Hiermee kunnen `granted`-scopes als selectieregel worden geformuleerd ("alle documenten van archiefvormer Bunnik", of "alle bouwtekeningen van gemeente X") zonder dat het register een expliciete lijst URI's hoeft te bevatten; de resolver matcht de scope tegen deze attributen. (De opslag is per archiefvormer ingericht, dus dit attribuut volgt logisch uit de inname.)
-  - een verwijzing naar de geldende **voorwaarden-tekst** voor de persoonlijke kopie (deze kan per document of per collectie verschillen; de tekst zelf wordt niet in de store gedupliceerd maar via een identificeerbare verwijzing ontsloten, bijv. een voorwaarden-ID of URI),
+  - een verwijzing naar de geldende **voorwaarden-tekst** voor de persoonlijke kopie. De teksten zelf staan **centraal** in een klein, beheerd aantal voorwaarden-documenten (bijv. per collectie of landelijk vastgesteld); in het attributenrecord staat uitsluitend een verwijzing (voorwaarden-ID of URI), zodat teksten op één plaats kunnen worden herzien zonder miljoenen records aan te passen. Per document kan slechts de *verwijzing* verschillen; dat het aantal teksten klein blijft is een beheerprincipe, geen architecturaregel,
   - de **opslaglocatie**: bucket en object-key (de buckets zijn per archiefvormer ingericht, dus niet uit de URI afleidbaar; de resolver heeft deze nodig voor het genereren van presigned URL's). De **publieke (CDN-)URI** voor categorie 0 kan volgens een vast, generiek patroon uit de persistente URI worden afgeleid en hoeft dan niet per document te worden opgeslagen; alleen bij afwijkende publicatielocaties (bijv. een aparte publicatieprefix of -bucket) wordt ook die opgeslagen.
 
   Het context-niveau van de gebruiker komt uit de authenticatie-/sessievoorziening (§3.2).
@@ -230,7 +230,7 @@ Eerste poging:
 
 1. Applicatie: `GET /resolve?uri=...` met het context-token van de gebruiker. De context bevat nog geen `consented`-item voor het dossier van dit document.
 2. Resolver: attributenrecord geeft basiscategorie 1, vereiste context `consented` voor dit dossier.
-3. Besluit: **Deny**, antwoord met `basiscategorie: 1`, `route: consent` en de verwijzing naar de voorwaarden-tekst uit het attributenrecord (deze kan per document verschillen).
+3. Besluit: **Deny**, antwoord met `basiscategorie: 1`, `route: consent` en de verwijzing naar de voorwaarden-tekst uit het attributenrecord (een verwijzing naar een centraal beheerde tekst, niet per document opgeslagen; alleen de verwijzing verschilt eventueel per document of collectie).
 
 Instemming (verantwoordelijkheid applicatielaag, resolver niet betrokken):
 
@@ -273,3 +273,17 @@ Bijzonderheden uit §2.1 die hier spelen:
 - **Stapeling**: de resolver behandelt de context als verzameling, niet als rang. Een studiezaalbezoeker met een `granted` scope krijgt voor documenten in die scope de categorie-3-toegang, en daarbuiten `studyroom`-toegang voor categorie 2 — de ruimste combinatie prevaleert per document.
 - **Weigering is een route, geen einde**: bij elk Deny antwoordt de resolver met de basiscategorie, zodat de applicatie de passende vervolgroute kan tonen: instemming (1), studiezaal-informatie (2), aanvraag bij de archivaris (3), of de publieke afgeleide waar die in de metadata is vastgelegd (§6).
 - **Onvolledig of ongeldig token**: een token dat niet geverifieerd kan worden of verlopen is, wordt behandeld als lege context. Voor categorie 0 verandert dat niets; voor 1–3 volgt automatisch Deny met de passende route.
+
+## Bijlage B: concretisering in de bestaande stack
+
+De architectuur voegt bewust geen nieuwe technologie toe: alle onderdelen passen in de stack die het e-depot al heeft (Elasticsearch, Python/FastAPI, Triply, bestaande S3-provider). Leidraad is zo min mogelijk verschillende applicaties. De invulling hieronder is een suggestie voor de realisatie, geen architecturale keuze.
+
+| Component | Invulling | Nieuwe applicatie? |
+| --- | --- | --- |
+| Resolver (PEP + beslislogica) | FastAPI-service; presigning via de bestaande S3-provider (`boto3`) | nieuw, klein |
+| Attributenstore | index in de bestaande Elasticsearch; de vulling vanuit de sidecars is een Python-pijplijn die nu ook de zoekindex vult en vult de attributen-index in dezelfde run | nee, hergebruik |
+| Context-token ondertekenen/verifiëren | `python-jose` binnen diezelfde FastAPI-dienst | library, geen applicatie |
+| Sessie-/instemmingsregister | Elasticsearch-index (of in-memory per FastAPI-worker als sessies kort leven; ES is veiliger) | nee, hergebruik |
+| Autorisatieregister (`granted`) | Elasticsearch-index met een klein beheerformulier; kan in de bestaande beheeromgeving of als extra endpoints in de FastAPI-dienst | nee, hergebruik |
+
+Eén open realisatiekeuze: **één FastAPI-dienst of twee** (resolver, en sessie/auth)? Argument voor twee: de sleutel die tokens ondertekent hoort bij een component dat geen publiek verkeer afhandelt. Argument voor één: het is hetzelfde team, dezelfde deployment, en zolang de sleutel uit de environment komt en niet via een endpoint wordt ontsloten, is het risicoverschil beperkt. Voorgesteld wordt met één te beginnen en pas bij een concrete reden te splitsen, met interne modulengrenzen (resolver-beslissing, sessie, register) zodat een latere afsplitsing de architectuur niet breekt.

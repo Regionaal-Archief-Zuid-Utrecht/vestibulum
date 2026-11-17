@@ -27,7 +27,7 @@ De vier documentcategorieën (0–3) en de actor-matrix staan in requirements §
 
 Twee regels voltooien het beslisbeleid:
 
-- **Stapeling**: wie op meerdere gronden toegang heeft (bijv. `studyroom` én een `granted` scope), krijgt de ruimste combinatie. Het context-niveau is dus geen enum maar een verzameling.
+- **Stapeling**: wie op meerdere gronden toegang heeft (bijv. `studyroom` én een `granted` scope), krijgt de ruimste combinatie. Het context-niveau is dus geen enum maar een verzameling. Een `granted` bezoeker krijgt toegang tot alles wat voor hem is verleend, uiteraard categorie 0, categorie 1 na instemming, en categorie 2 wanneer hij zich in de studiezaal bevindt: hoe meer context matcht, hoe meer toegang. (De actor-matrix in requirements §1.2.2 beschrijft daarmee het typische gebruik per actor, geen verbod op combinaties.)
 - **Scope-specificiteit**: een `granted`-toegang geldt uitsluitend voor de documenten of dossiers waarvoor hij is verleend. Valt binnen zo'n scope een document met basiscategorie 1 of 2, dan telt voor die actor de via categorie 3 verkregen toegang — niet de basiscategorie.
 
 ### 2.2 Metadata en vindbaarheid
@@ -42,6 +42,8 @@ De architectuur volgt de rolverdeling uit de XACML-referentiearchitectuur (die N
 
 - **PEP (Policy Enforcement Point)** — de **resolver**: de voorziening die als enige documenten uitgeeft. Elke toegangsvraag wordt hier gehandhaafd.
 - **Beslislogica (PDP-functie)** — ingebouwd in de resolver, als gedeelde bibliotheek of module. Het beleid is klein (de tabel uit §2.1 plus stapeling en scope) en verdient geen eigen dienst; de logica moet wel op precies één plek geïmplementeerd zijn.
+- **Contextbron: sessie-/autorisatievoorziening** — het component dat sessies en instemmingen administreert en het **context-token opstelt en ondertekent** (asymmetrisch: de resolver controleert met alleen een publieke sleutel en kan zelf geen tokens maken). Zij ondertekent nooit aangedragen claims, maar uitsluitend wat zijzelf in haar eigen administratie heeft vastgelegd (§3.2, Bijlage A). Dit is bewust een dun component: een sessieregister, een instemmingsregister, een koppeling naar het autorisatieregister en één sleutelpaar.
+- **Autorisatieregister** — de administratie van verleende `granted`-toegangen (tijdelijk dan wel functiegebonden; zie A.5). Gevuld door beheerprocessen (archivaris, deelnemende organisaties), gelezen door de sessie-/autorisatievoorziening, door niemand anders gemuteerd. De administratie zelf is buiten scope (requirements §1.2.4); architectonisch is het een register met records: gebruiker → scope + geldigheid + verleend door.
 - **Attribuutbronnen (PIP-rol)** — de bron van waarheid voor de categorie en einddatum per document blijft de RDF-sidecar, maar op de request-path bevraagt de resolver deze niet direct via SPARQL. In plaats daarvan wordt per document een attributenrecord **gematerialiseerd in een snelle attributenstore**: een eenvoudige database of een per-document entry in de bestaande Elasticsearch-index. De store wordt gevoed door het inname- en herclassificatieproces (§4). Een attributenrecord bevat minimaal:
   - de persistente **URI** van het document (sleutel),
   - de **basiscategorie** en de **einddatum** van de beperking,
@@ -55,6 +57,8 @@ De architectuur volgt de rolverdeling uit de XACML-referentiearchitectuur (die N
 
 De website (Valeros) en de ondersteunende services (IIIF, PDF, snippet, export) zijn 'dom': zij vragen elk document uitsluitend via de resolver aan en handhaven zelf niets.
 
+Eén nuance bij de eis "één bron van waarheid" (requirements §1.2.4): het ontwerp kent drie registers, maar elk registreert een eigen soort feit met een eigen eigenaar — de **RDF-sidecars** voor de toegangsbeperkingen per document (bron van waarheid in de zin van de eis), het **instemmingsregister** (deel van de sessievoorziening) voor de actuele instemmingen per sessie, en het **autorisatieregister** voor verleende rechten per gebruiker. Er is geen overlap tussen de drie: geen enkel feit wordt in meer dan één register beheerd. Daarmee blijft de eis overeind in zijn kern: nergens hoeven administraties "in de pas te lopen", want elk feit heeft precies één plek.
+
 ## 3. Uitgifte via de resolver
 
 ### 3.1 Het vaste patroon
@@ -65,11 +69,13 @@ Alle applicaties en services verkrijgen documenten uitsluitend via één patroon
 
 ```mermaid
 sequenceDiagram
+  participant Auth as Sessie-/autorisatievoorziening
   participant App as Applicatie (Valeros, IIIF, PDF, export)
   participant Res as Resolver (PEP)
-  participant Attr as Attributenstore + sessie
+  participant Attr as Attributenstore
   participant S3 as S3-opslag
   participant CDN as CDN
+  Auth-->>App: ondertekend context-token (sessie, consent, granted)
   App->>Res: GET /resolve?uri=... (context-token)
   Res->>Attr: categorie document + context gebruiker
   Attr-->>Res: categorie 0-3, scopes, geldigheid
@@ -99,7 +105,7 @@ De resolver vertrouwt **nooit** een context-niveau dat de aanroepende applicatie
 
 - **`consented`** — de gebruiker (online bezoeker of studiezaalbezoeker) heeft de voorwaarden voor de persoonlijke kopie geaccepteerd; de instemming geldt per dossier en wordt als zodanig in het token gecodeerd (of bijgehouden in een sessievoorziening die de resolver raadpleegt).
 - **`studyroom`** — de aanvraag komt uit de studiezaal-voorziening (terminal of studiezaalnetwerk), technisch herkenbaar aan een terminalspecifiek token of netwerkherkomst. Er is geen individuele aanmelding; de terminal zelf treedt op als aangewezen "gebruiker".
-- **`granted`** — de individueel aangemelde gebruiker (geautoriseerde bezoeker of medewerker van een deelnemende organisatie) met de verleende scopes; de scopes staan in het token of in een autorisatieregister dat de resolver raadpleegt.
+- **`granted`** — de individueel aangemelde gebruiker (geautoriseerde bezoeker of medewerker van een deelnemende organisatie) met de verleende scopes. De scopes staan in het token, ontleend aan het autorisatieregister (§2.3). Omvangrijke verleningen worden als **selectieregel** geformuleerd (op archiefvormer/documenttype) in plaats van als expliciete URI-lijst, zodat het token compact blijft.
 
 De vertaling van actoren (requirements §1.2.2) naar context-niveaus: de online bezoeker kan uitsluitend `consented` verwerven; de studiezaalbezoeker `consented` en `studyroom`; de geautoriseerde bezoeker en de medewerker `granted`; de geautomatiseerde gebruiker geen van alle — hij krijgt alleen categorie 0, binnen de bestaande CDN-begrenzingen. **[TBV]** De decentrale gebruikersbeheer-eis (beheer via systemen van deelnemende gemeenten, requirements §1.2.4) impliceert een koppeling tussen die systemen en de token-/autorisatievoorziening; de vorm van het medewerkers-token (per archiefvormer, per documenttype, of vrije selectie) is nog te specificeren.
 
@@ -165,6 +171,7 @@ Het ontwerp accepteert bewust risico ten gunste van maximale toegankelijkheid (r
 | Verouderde attributen na herclassificatie | attributenstore loopt achter op de sidecars | store-expliciet bijwerken bij herclassificatie (§4); periodieke verificatie vergelijkt store met sidecars; besluiten niet of zeer kort cachen |
 | Misbruik categorie-1-route voor harvesting | de instemmingsroute is laagdrempelig; een harvester kan de legale route (sessie starten, instemmen, ophalen) automatiseren | instemming per dossier; rate limiting op de resolver (plafond op resolves én nieuwe instemmingen per sessie/IP); anomaliedetectie op het auditlog (patroon: veel sessies met telkens één dossier); eventueel conditioneel een drempelverhogende stap (CAPTCHA/e-mail) bij vermoeden van automatisering. Vervalste tokens zijn géén route: de ondertekening door de sessievoorziening wordt per aanroep geverifieerd (§3.2) |
 | Resolver als single point of failure | alle uitgifte van categorie 1–3 via één voorziening | hoge beschikbaarheid van een bewust eenvoudige component; publieke route (categorie 0) blijft via CDN ook bij resolver-uitval werken |
+| De auditlog als gegevensverzameling | het log registreert wie welke categorie 1–3-documenten raadpleegt; daarmee is het zelf AVG-gevoelig (§A.1) | bewaartermijn vaststellen, toegang beperken tot beveiliging/rapportage, log meenemen in de privacy-regeling |
 
 ## 8. Open punten (TBV)
 
@@ -174,6 +181,7 @@ Het ontwerp accepteert bewust risico ten gunste van maximale toegankelijkheid (r
 4. Decentrale koppeling voor gebruikersbeheer van deelnemende gemeenten (requirements §1.2.4).
 5. Persoonlijke kopieën in de studiezaal (printen) en handmatige verificatie bij de e-mail-route (requirements §1.2.2, categorie 1).
 6. Rapportage-functionaliteit (requirements §1.2.4) — de resolver-auditlog levert hiervoor de gegevens.
+7. ~~Stapeling versus actor-matrix~~ — **beslist (2026-11-17)**: de stapelingsregel is de norm. Een `granted` bezoeker krijgt toegang tot alles wat voor hem is verleend, uiteraard categorie 0, categorie 1 na instemming, en categorie 2 wanneer hij zich in de studiezaal bevindt. Hoe meer context matcht, hoe meer toegang. De actor-matrix in requirements §1.2.2 beschrijft het typische gebruik per actor (welke voorzieningen nodig zijn om tot een categorie te geraken), niet een verbod op combinaties. De resolver implementeert de stapelende variant (§2.1, A.6).
 
 ## Bijlage A: de resolver-flow per categorie
 
@@ -200,7 +208,9 @@ De mogelijke antwoorden:
 | Permit, categorie 1–3 | redirect naar presigned URL (kort geldig) | document ophalen via S3 |
 | Deny | weigering + `basiscategorie` + `route` | applicatie toont de passende route (§A.3–A.6) |
 
-Elke aanroep wordt gelogd: tijdstip, URI, context-samenvatting, besluit, afgeleverde URL-variant (publiek/presigned). Dit log vormt de basis voor de rapportage-functionaliteit (requirements §1.2.4).
+Elke aanroep wordt gelogd: tijdstip, URI, context-samenvatting, besluit, afgeleverde URL-variant (publiek/presigned). Dit log vormt de basis voor de rapportage-functionaliteit (requirements §1.2.4). **Let op**: het log is zelf een AVG-gevoelige gegevensverzameling — bij categorie 1–3 staat er per definitie vast wie welke mogelijk persoonsgegevens bevattende documenten heeft geraadpleegd. Bewaartermijn, toegangsbeperking en verwerkingsdoel van het log moeten daarom vastgesteld worden (alleen raadplegen voor beveiliging en rapportage), en het log valt daarmee zelf onder de beveiligings- en privacyregeling van het e-depot.
+
+Performance-aandachtspunt: één pagina-weergave via IIIF kan tientallen resolve-aanroepen betekenen (tiles). De resolver is daarmee een hot path voor categorie 1–3, óók omdat presigned URL's maar kort geldig zijn. Tegengestelde maatregelen (naar keuze, meerdere mogelijk): de beslissen-cache uit §4 ook voor uitgifte toepassen, de presigned URL geldig per object houden zolang de beslissing gecached is, of per pagina/sessie één afgegeven URL hergebruiken. De architectuur schrijft geen keuze voor, maar de component moet op dit gebruik ontworpen worden.
 
 De beslisvolgorde is in alle gevallen: (1) attributenrecord ophalen uit de attributenstore (categorie, einddatum, dossier-URI, voorwaarden-verwijzing, opslaglocatie, vereiste context); (2) context-token verifiëren en uitlezen; (3) beslisregels toepassen (tabel §2.1, stapeling, scope); (4) antwoorden. Als de URI niet in de store staat: Deny.
 

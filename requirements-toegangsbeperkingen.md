@@ -140,6 +140,6 @@ De toegang tot documenten, of een bredere selectie van documenten, moet in minde
 
 Het laten verlopen van toegangsbeperkingen moet automatisch kunnen gebeuren, minstens op jaarlijkse basis.
 
-Administratie van de tijdelijke toegang voor documenten in categorie 3 is nu buiten scope; de aanvraag- en uitgifteflow (verlening via een uitgereikt credential) is uitgewerkt in het architectuurdocument.
+De formele administratie van het verleningsproces voor tijdelijke toegang (aanvraagdossiers, besluitvorming, archiefverantwoording) is nu buiten scope. Het register met verleende toegangen dat de toegangsvoorziening bij de raadpleging nodig heeft, is daarentegen essentieel; de aanvraag- en uitgifteflow (verlening via een uitgereikt credential) is uitgewerkt in het architectuurdocument.
 
 Rapportage-functionaliteit?

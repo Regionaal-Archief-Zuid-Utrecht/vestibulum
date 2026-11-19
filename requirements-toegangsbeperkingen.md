@@ -91,7 +91,7 @@ Een ander gebruiksgeval in deze categorie is waarbij medewerkers vanuit een aang
 
 (NB: is de toegang dan per gemeente of zijn ook andere selecties nodig? Bijvoorbeeld toegang tot alle documenten van een bepaald type (ongeachte archiefvormer?), of toegang tot alle documenten ongeacht vorm of type?)
 
-Een verleende toegang is altijd scope-specifiek: zij geldt uitsluitend voor de documenten of dossiers waarvoor zij is verleend. Binnen zo'n scope kunnen documenten met een andere basiscategorie (1 of 2) vallen; voor de bevoegde actor geldt dan de toegang zoals die via categorie 3 is verleend — het geven van instemming voor gebruik als persoonlijke kopie, of een studiezaalbezoek is daar in dat geval daarvoor niet vereist. TODO: access = temporary
+Een verleende toegang is altijd scope-specifiek: zij geldt uitsluitend voor de documenten of dossiers waarvoor zij is verleend. Binnen zo'n scope kunnen documenten met een andere basiscategorie (1 of 2) vallen; voor de bevoegde actor geldt dan de toegang zoals die via categorie 3 is verleend — het geven van instemming voor gebruik als persoonlijke kopie, of een studiezaalbezoek is daar in dat geval daarvoor niet vereist. Tijdelijke verleningen kennen een expliciete einddatum en verlopen automatisch.
 
 ###### Actoren en toegangsmatrix
 
@@ -114,6 +114,7 @@ De matrix heeft betrekking op toegang tot documenten; de metadata-beperkingen ui
 | Medewerker deelnemende organisatie | ✓ | ✓ | – | verleende selectie |
 | Geautomatiseerde gebruiker | ✓, binnen begrenzingen | – | – | – |
 
+De matrix beschrijft per actor het **typische gebruik**: welke voorziening de actor benut om toegang te verkrijgen. Hij is geen verbod op combinaties — wie aan meerdere voorwaarden voldoet, krijgt de ruimste combinatie. Zo raadpleegt een gebruiker met een verleende toegang die zich in de studiezaal bevindt ook categorie-2-documenten, en een studiezaalbezoeker kan óók instemmen met de voorwaarden voor categorie 1.
 
 #### 1.2.3. Gradaties in toegang tot de metadata
 
@@ -139,6 +140,6 @@ De toegang tot documenten, of een bredere selectie van documenten, moet in minde
 
 Het laten verlopen van toegangsbeperkingen moet automatisch kunnen gebeuren, minstens op jaarlijkse basis.
 
-Administratie van de tijdelijke toegang voor documenten in categorie 3 is nu buiten scope. (TODO: explain better- & how is the wrkflow for requesting access?& check dienstverlening)
+Administratie van de tijdelijke toegang voor documenten in categorie 3 is nu buiten scope; de aanvraag- en uitgifteflow (verlening via een uitgereikt credential) is uitgewerkt in het architectuurdocument.
 
 Rapportage-functionaliteit?

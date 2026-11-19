@@ -45,14 +45,15 @@ Toegangsbeperkingen worden in de RDF geadministreerd en zijn beschikbaar via de 
 ### 1.2. Functionele eisen en wensen
 
 #### 1.2.1. Persistente URIs
-Een uitgangspunt is dat we zo veel mogelijk werken met persistente URIs. Dit zowel voor de documenten in de datalaag, de metadata-entiteiten die geserveerd worden via de applicatielaag, als ook voor de presentaties van documenten en dossiers.
+Een uitgangspunt is dat we zo veel mogelijk werken met persistente URIs. Dit zowel voor de documenten in de datalaag, de metadata-entiteiten die geserveerd worden via de applicatielaag, als ook voor de presentaties van documenten en dossiers. *** TODO: also Resolvable****
 
 Publiek toegankelijke documenten moeten met die persistente URI uit de datalaag opgevraagd kunnen worden.
 Wenselijk is dat ook documenten die niet publiek toegankelijk zijn via de URI uit de datalaag opgevraagd kunnen worden (maar dat dan een noodzakelijke authenticatie- en autorisatiestap volgen).
 
 #### 1.2.2. Gradaties in toegang tot de documenten
 Wat betreft de toegang tot documenten uit de datalaag voorzien we, te specificeren per document, 4 mogelijke niveaus van toegang:
-0. online en publiek toegankelijk
+
+0. online en publiek toegankelijk (TODO: KB stuff license - explain)
 1. online, maar enkel toegankelijk, via een aangevraagde kopie voor persoonlijk gebruik en na instemming met de voorwaarden
 2. toegankelijk via de voorziening in de RAZU-studiezaal
 3. online, maar enkel toegankelijk voor specifieke gebruikers, na aanmelding
@@ -90,7 +91,7 @@ Een ander gebruiksgeval in deze categorie is waarbij medewerkers vanuit een aang
 
 (NB: is de toegang dan per gemeente of zijn ook andere selecties nodig? Bijvoorbeeld toegang tot alle documenten van een bepaald type (ongeachte archiefvormer?), of toegang tot alle documenten ongeacht vorm of type?)
 
-Een verleende toegang is altijd scope-specifiek: zij geldt uitsluitend voor de documenten of dossiers waarvoor zij is verleend. Binnen zo'n scope kunnen documenten met een andere basiscategorie (1 of 2) vallen; voor de bevoegde actor geldt dan de toegang zoals die via categorie 3 is verleend — het geven van instemming voor gebruik als persoonlijke kopie, of een studiezaalbezoek is daar in dat geval daarvoor niet vereist.
+Een verleende toegang is altijd scope-specifiek: zij geldt uitsluitend voor de documenten of dossiers waarvoor zij is verleend. Binnen zo'n scope kunnen documenten met een andere basiscategorie (1 of 2) vallen; voor de bevoegde actor geldt dan de toegang zoals die via categorie 3 is verleend — het geven van instemming voor gebruik als persoonlijke kopie, of een studiezaalbezoek is daar in dat geval daarvoor niet vereist. TODO: access = temporary
 
 ###### Actoren en toegangsmatrix
 
@@ -129,8 +130,8 @@ Het instemmen met de voorwaarden voor een persoonlijk kopie heeft betrekking op 
 
 Het verlenen van toegang moet met zo min mogelijke administratieve stappen kunnen gebeuren.
 
-Beheer van toegang voor ingelogde gebruikers (categorie 3) geschiedt zo veel mogelijk decentraal, bijvoorbeeld via de systemen van de gemeenten die in RAZU participeren.
-RAZU moet ook zelf gebruikers kunnen beheren die tijdelijk toegang nodig hebben.
+Beheer van toegang voor gebruikers met een verleende toegang (categorie 3) geschiedt zo veel mogelijk decentraal, bijvoorbeeld via de systemen van de organisaties die in RAZU participeren. Zo'n organisatie beheert dan ook zelf wíé haar medewerkers zijn — RAZU beheert geen accounts van medewerkers.
+Daarnaast moet RAZU zelf tijdelijke toegangen kunnen verlenen aan gebruikers die niet via een deelnemende organisatie komen. Ook dat is verlenen van toegang (met einddatum), geen gebruikersadministratie: er is geen account, de aanmelding gebeurt met een uitgereikt credential.
 
 Er is één bron van waarheid voor de toegangsbeperkingen: de RDF-sidecars. Voorkomen moet worden dat toegangsbeperkingen in meerdere systemen worden beheerd of dat administraties in verschillende systemen langere tijd uit de pas kunnen gaan lopen.
 
@@ -138,6 +139,6 @@ De toegang tot documenten, of een bredere selectie van documenten, moet in minde
 
 Het laten verlopen van toegangsbeperkingen moet automatisch kunnen gebeuren, minstens op jaarlijkse basis.
 
-Administratie van de tijdelijke toegang voor documenten in categorie 3 is nu buiten scope.
+Administratie van de tijdelijke toegang voor documenten in categorie 3 is nu buiten scope. (TODO: explain better- & how is the wrkflow for requesting access?& check dienstverlening)
 
 Rapportage-functionaliteit?

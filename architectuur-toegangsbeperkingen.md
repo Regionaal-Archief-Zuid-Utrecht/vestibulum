@@ -9,8 +9,8 @@ Requirements: `requirements-toegangsbeperkingen.md` — dit document bevat uitsl
 De toegangsvoorziening moet de geldende beperkingen afdwingen over alle routes waarlangs content het e-depot verlaat: web (Valeros), IIIF-tiles, PDF-generatie, snippets en exports. Het ontwerp kent drie randvoorwaarden:
 
 1. **Aansluiting op de bestaande gelaagde architectuur** — hergebruik van bestaande componenten (S3-replica, CDN, SURA, RDF-sidecars als bron van waarheid); geen vervanging van lagen.
-2. **Eenvoud boven complexiteit** — één beslisregel, één uitgiftepunt, geen aparte autorisatie-infrastructuur die de vier categorieën niet nodig hebben.
-3. **Bewust geaccepteerd rest risico** — maximale toegankelijkheid impliceert dat onbedoelde beschikbaarstelling als geaccepteerd risico wordt gedocumenteerd (zie §7).
+2. **Eenvoud boven complexiteit** — de architectuur kiest voor de minst complexe oplossing die aan de requirements voldoet.
+
 
 ## 2. Model
 
@@ -134,7 +134,7 @@ Consequenties:
 
 - De **persistente URI blijft de access-key**: ook afgeschermde documenten worden via hun datalaag-URI aangesproken (requirements §1.2.1), alleen langs de resolver, die de vereiste authenticatie-/autorisatiestap afdwingt.
 - **Alle uitgiftekanalen lopen langs hetzelfde chokepoint**: webweergave, IIIF-tiles, PDF-generatie, snippets en export gebruiken identiek dezelfde route. Er is geen route die "hoopt" dat een object public read is.
-- **Eén auditlog**: elk verzoek aan elk document van elke applicatie passeert de resolver en wordt gelogd (wie, welk document, welk context-niveau, welk besluit, wanneer).
+- **Eén auditlog**: elk verzoek aan elk document van elke applicatie passeert de resolver en wordt gelogd — minimaal IP (edge-stempel), tijdstip, basiscategorie, besluit en route; URI en context-samenvatting alleen in het uitgebreide log (§A.1).
 - **Eén plek voor beleidswijziging**: een nieuw context-niveau of een aangepaste matrix betekent alleen een aanpassing van de resolver.
 
 De resolver kan worden opgebouwd uit of aansluiten op de bestaande voorziening **SURA**, die al URI's naar URL's kan vertalen. De JWT-mogelijkheid van SURA voor het CDN blijft in dit ontwerp **ongebruikt**: kale opslag-URI's van publieke documenten moeten zonder token blijven werken, en handhaving na uitgifte is voor categorie 1–3 geregeld met presigned URL's op S3. Dit ontwerp maakt SURA tot het natuurlijke fundament van de resolver: URI → besluit → URL.
@@ -197,7 +197,9 @@ Beperkingen hebben einddata (requirements §1): AVG-beperkingen 82 jaar na creat
 - Een periodiek (minimaal jaarlijks) proces herclassificeert documenten waarvan de beperking is verlopen (bijv. categorie 2 → 0) en werkt de sidecars, de zoekindex en — bij categorie 0 — de publicatiestatus (§5.2) bij. Daarmee is voldaan aan de eis dat verloop automatisch moet kunnen gebeuren (requirements §1.2.4).
 - Bij herclassificatie naar categorie 0 wordt het object **expliciet gepubliceerd** (§5.2); bij herclassificatie naar een strengere categorie (verzaling, herijking) wordt de publieke status expliciet **ingetrokken**. Het metadata-attribuut alleen is niet voldoende; de publieke status in de opslag moet mee bewegen.
 
-De eis "aanpassingen binnen een dagdeel effectief" (requirements §1.2.4) wordt gehaald doordat (a) de bron van waarheid de sidecars zijn, (b) herclassificatie een kwestie is van sidecar-, store- en index-update, en (c) de resolver per verzoek beslist tegen de attributenstore (§2.3). De attributenstore wordt bij herclassificatie expliciet bijgewerkt, zodat de "dagdeel"-garantie afhangt van het updateproces en niet van cache-verloop. Beslissingen zelf worden niet of hooguit zeer kort (minuten) gecached, zodat een beleidswijziging direct effect heeft. Onbekende URI's (niet in de store) worden eenduidig geweigerd: Deny.
+De eis "aanpassingen binnen een dagdeel effectief" (requirements §1.2.4) wordt gehaald doordat (a) de bron van waarheid de sidecars zijn, (b) herclassificatie een kwestie is van sidecar-, store- en index-update, en (c) de resolver per verzoek beslist tegen de attributenstore (§2.3). De attributenstore wordt bij herclassificatie expliciet bijgewerkt, zodat de "dagdeel"-garantie afhangt van het updateproces en niet van cache-verloop. Beslissingen zelf worden niet of hooguit zeer kort (minuten) gecached, zodat een beleidswijziging direct effect heeft. Onbekende URI's (niet in de store) worden in de steady state eenduidig geweigerd: **Deny** (fail-closed; de store is de enige runtime-bron en elk verzoek landt in het auditlog).
+
+**Migratiefase (optioneel).** Tijdens de uitrol mag SURA al als resolver-base dienen zónder gevulde attributenstore, mits §5.1/§5.2 onverkort gelden (buckets default-deny; alleen expliciet gepubliceerde cat-0-objecten publiek leesbaar). Voor een onbekende URI mag de resolver dan de publieke CDN-URI teruggeven in plaats van Deny — S3 weigert de bytes voor cat 1–3 op objectniveau alsnog. Deze fallback is een expliciete, tijdelijke configuratie; zodra de attributenstore als authoritatief wordt gedeclareerd, gaat de default terug naar Deny. Cat 1–3 via presigned URL vereisen hoe dan ook de store.
 
 ## 5. Opslag en de publieke sfeer
 
@@ -240,7 +242,7 @@ Het ontwerp accepteert bewust risico ten gunste van maximale toegankelijkheid (r
 | Verouderde attributen na herclassificatie | attributenstore loopt achter op de sidecars | store-expliciet bijwerken bij herclassificatie (§4); periodieke verificatie vergelijkt store met sidecars; besluiten niet of zeer kort cachen |
 | Misbruik categorie-1-route voor harvesting | de instemmingsroute is laagdrempelig; een harvester kan de legale route (sessie starten, instemmen, ophalen) automatiseren | instemming per dossier; gelaagde anti-automatisering op `/consent` (§A.3): ALTCHA-PoW als eerste drempel, **honeypot-veld** in het formulier (ingevuld → géén instemming, wel logging en het IP op de blocklist), **rate limiting per IP en per sessie** op `/consent` én `/resolve` (plafond op resolves én nieuwe instemmingen), en **IP-blocking** (tijdelijk, of tot handmatige vrijgave) bij honeypot-hit of herhaalde plafond-overschrijding. Het IP komt daarbij uit de edge-stempel (§3.2), nooit uit een client-aangeboden header. Daarnaast anomaliedetectie op het auditlog (patroon: veel sessies met telkens één dossier) met desnoods adaptief zwaardere PoW per IP, en eventueel conditioneel een drempelverhogende stap (e-mail) bij vermoeden van automatisering. Vervalste tokens zijn géén route: de ondertekening door de sessievoorziening wordt per aanroep geverifieerd (§3.2) |
 | Resolver als single point of failure | alle uitgifte van categorie 1–3 via één voorziening | hoge beschikbaarheid van een bewust eenvoudige component; publieke route (categorie 0) blijft via CDN ook bij resolver-uitval werken |
-| De auditlog als gegevensverzameling | het log registreert wie welke categorie 1–3-documenten raadpleegt; daarmee is het zelf AVG-gevoelig (§A.1) | bewaartermijn vaststellen, toegang beperken tot beveiliging/rapportage, log meenemen in de privacy-regeling |
+| De auditlog als gegevensverzameling | zelfs het minimale log bevat IP-adressen (persoonsgegevens) bij cat 1–3; het uitgebreide log registreert wie welk document raadpleegt (§A.1) | standaard alleen het minimale log; bewaartermijn vaststellen, toegang beperken tot beveiliging/rapportage, log meenemen in de privacy-regeling | bewaartermijn vaststellen, toegang beperken tot beveiliging/rapportage, log meenemen in de privacy-regeling |
 
 ## 8. Open punten (NTB)
 
@@ -278,11 +280,16 @@ De mogelijke antwoorden:
 | Permit, categorie 1–3 | redirect naar presigned URL (kort geldig) | document ophalen via S3 |
 | Deny | weigering + `basiscategorie` + `route` | applicatie toont de passende route (§A.3–A.6) |
 
-Elke aanroep wordt gelogd: tijdstip, URI, context-samenvatting, besluit, afgeleverde URL-variant (publiek/presigned). Dit log vormt de basis voor de rapportage-functionaliteit (requirements §1.2.4). **Let op**: het log is zelf een AVG-gevoelige gegevensverzameling — bij categorie 1–3 staat er per definitie vast wie welke mogelijk persoonsgegevens bevattende documenten heeft geraadpleegd. Bewaartermijn, toegangsbeperking en verwerkingsdoel van het log moeten daarom vastgesteld worden (alleen raadplegen voor beveiliging en rapportage), en het log valt daarmee zelf onder de beveiligings- en privacyregeling van het e-depot.
+Elke aanroep wordt gelogd, op twee niveaus:
+
+- **Minimaal log (standaard)** — voor beveiliging en anomaliedetectie (§7): tijdstip, client-IP (uit de edge-stempel, §3.2), basiscategorie, besluit (permit/deny), route. Hier is géén document-URI en géén gebruikersidentiteit in opgenomen.
+- **Uitgebreid log (optioneel)** — alleen als rapportage dat eist (requirements §1.2.4, open punt §8.6): además de URI en context-samenvatting (wie welk document).
+
+**Let op**: het log is zelf een AVG-gevoelige gegevensverzameling. Al in het minimale log is het IP een persoonsgegeven en staat vast welk adres cat 1–3 heeft geraadpleegd; in het uitgebreide log staat per definitie vast wie welke mogelijk persoonsgegevens bevattende documenten heeft geraadpleegd. Bewaartermijn, toegangsbeperking en verwerkingsdoel van het log moeten daarom vastgesteld worden (raadplegen alleen voor beveiliging en rapportage), en het log valt daarmee zelf onder de beveiligings- en privacyregeling van het e-depot. De standaard is daarom het minimale log; het uitgebreide log alleen na expliciete AVG-toetsing van het rapportage-doel.
 
 Performance-aandachtspunt: één pagina-weergave via IIIF kan tientallen resolve-aanroepen betekenen (tiles). De resolver is daarmee een hot path voor categorie 1–3, óók omdat presigned URL's maar kort geldig zijn. Tegengestelde maatregelen (naar keuze, meerdere mogelijk): de beslissen-cache uit §4 ook voor uitgifte toepassen, de presigned URL geldig per object houden zolang de beslissing gecached is, of per pagina/sessie één afgegeven URL hergebruiken. De architectuur schrijft geen keuze voor, maar de component moet op dit gebruik ontworpen worden.
 
-De beslisvolgorde is in alle gevallen: (1) attributenrecord ophalen uit de attributenstore (categorie, einddatum, dossier-URI, voorwaarden-verwijzing, opslaglocatie, vereiste context); (2) context-token verifiëren en uitlezen; (3) beslisregels toepassen (tabel §2.1, stapeling, scope); (4) antwoorden. Als de URI niet in de store staat: Deny.
+De beslisvolgorde is in alle gevallen: (1) attributenrecord ophalen uit de attributenstore (categorie, einddatum, dossier-URI, voorwaarden-verwijzing, opslaglocatie, vereiste context); (2) context-token verifiëren en uitlezen; (3) beslisregels toepassen (tabel §2.1, stapeling, scope); (4) antwoorden. Als de URI niet in de store staat: Deny (migratiefase: publieke CDN-URI, zie §4).
 
 ### A.2 Categorie 0: publiek toegankelijk
 
@@ -353,7 +360,20 @@ Voor de anonieme context geldt een extra zorgvuldigheid: omdat de terminal de "g
 Bijzonderheden uit §2.1 die hier spelen:
 
 - **Scope-specificiteit**: de resolver checkt de genoemde scope tegen de dossier-/document-URI én de archiefvormer/type-attributen uit het attributenrecord. Een scope kan een expliciete opsomming zijn (document- of dossier-URI's) of een selectieregel ("alles van archiefvormer Bunnik", "alle bouwtekeningen van gemeente X"). Een verleende toegang geldt uitsluitend waar de scope daadwerkelijk op slaat.
-- **Binnen-scope versoepeling**: valt binnen een verleende scope een document met basiscategorie 1 of 2, dan beslist de resolver Permit zonder dat een aparte instemming of studiezaalbezoek nodig is — de categorie-3-toegang dekt die documenten.
+
+
+De scope-taal (eigen, klein — XACML is daarvoor niet nodig):
+
+```
+scope    := selector ("," selector)*     # OR over selectors
+selector := "doc:" <URI>                  # los document
+          | "dossier:" <URI>              # heel dossier
+          | "org:" <archiefvormer>        # alle documenten van één archiefvormer
+          | "type:" <documenttype>        # alle documenten van dit type
+          | "org:" <archiefvormer> "+type:" <documenttype>   # AND-combinatie
+```
+
+De resolver matcht elke selector tegen het attributenrecord (document-URI, dossier-URI, archiefvormer, documenttype); een document valt binnen de grant als minstens één selector matcht (OR), binnen één selector geldt AND. Voorbeelden: `dossier:https://data.razu.nl/dossier/bouw-1`, `org:gemeente-houten`, `org:gemeente-houten+type:bouwtekening`.- **Binnen-scope versoepeling**: valt binnen een verleende scope een document met basiscategorie 1 of 2, dan beslist de resolver Permit zonder dat een aparte instemming of studiezaalbezoek nodig is — de categorie-3-toegang dekt die documenten.
 - **Geldigheid (tijdelijk én functiegebonden)**: er zijn twee soorten `granted`, met hetzelfde technische mechanisme maar een andere levenscyclus. *Tijdelijke toegang* (geautoriseerde bezoeker) wordt verleend met een expliciete einddatum en vervalt automatisch. *Functiegebonden toegang* (medewerker van een deelnemende organisatie) kent geen einddatum, maar geldt zolang de functie geldt: het recht eindigt via de joiner/mover/leaver-voorziening van de eigen organisatie (uit dienst, of functiewissel waarbij de selectie niet meer past). In beide gevallen geldt de korte geldigheidsduur van het token: het register is de bron en het token ververst silent tegen het register (§3.2), dus een beëindigd recht werkt binnen de token-levensduur door. De administratie daarvan is buiten scope (requirements §1.2.4), maar architectonisch zijn beide een record in hetzelfde autorisatieregister: gebruiker → scope + geldig-tot (dan wel gekoppeld aan functie) + verleend door.
 
 ### A.6 Stapeling en algemene afhandeling
@@ -409,6 +429,8 @@ Losse termen in lekentaal, in volgorde van "wat ze hier doen" in dit ontwerp.
 - **PIP (Policy Information Point)** — waar de beslisfactoren vandaan komen: de attributenstore en de registers.
 - **PAP (Policy Administration Point)** — waar het beleid wordt vastgelegd: de RDF-sidecars en de beheer-/classificatieprocessen.
 - **Contextbron** — wie het bewijs van "wie vraagt" uitgeeft: de sessie-/autorisatievoorziening. XACML benoemt deze rol niet los; het concrete patroon komt uit OAuth/OIDC (de *authorization server*).
+- **XACML (eXtensible Access Control Markup Language)** — de OASIS-standaard voor attribute-based access control; hier als referentiearchitectuur voor de rolverdeling (PEP/PDP/PIP/PAP), niet als geïmplementeerd protocol (bewust níet gebruikt, zie Bijlage B).
+- **NIST SP 800-162** — het NIST-publicatie "Guide to Attribute Based Access Control (ABAC) Definition and Considerations"; de bron van de XACML-rolverdeling die §2.3 volgt.
 
 **Componenten**
 

@@ -25,7 +25,7 @@ covers cat-1/cat-2 documents inside it — no separate consent or study-room vis
 
 ## 2. Core idea: one chokepoint
 
-All non-public content leaves the depot through exactly **one route**: the **resolver** —
+All non-public documents leaves the depot through exactly **one route**: the **resolver** —
 `GET /resolve?uri={persistent URI}` plus a signed **context token**. It answers with:
 
 - a redirect to the public CDN URI (cat 0), or
@@ -89,8 +89,7 @@ Key properties:
   session service (JWS/JWT, ES256, keys distributed via JWKS). An unverifiable or expired
   token is treated as an empty context → deny for cat 1–3.
 - **Two hosts, split by key ownership**: `sessie.razu.nl` signs (private key),
-  `resolver.razu.nl` verifies (public key only). Compromising the resolver yields **no
-  token factory**.
+  `resolver.razu.nl` verifies (public key only). 
 - **Transport**: browser = `HttpOnly` cookie (`Secure`, `SameSite=Lax`, `Domain=razu.nl`);
   machine clients (IIIF, export) = `Authorization: Bearer`. The token is never in a URL.
   On page load the browser calls `GET /sessie/context` (`credentials: "include"`); the
@@ -108,7 +107,7 @@ Key properties:
 - **Study room (cat 2)**: edge-stamped IP (`X-Forwarded-For`, overwritten by the trusted
   edge — never a client-supplied header) or a terminal-bound token. Never a bare claim.
 
-## 4. Anti-automation on the deliberately low-threshold cat-1 route
+## 4. Blocking bot access to the cat-1 route
 
 Layered, because a single measure is not enough against bots:
 
@@ -147,7 +146,7 @@ Forged tokens are not a route: every request verifies the signature.
   URLs, CORS, RFC 6265 cookie semantics, IIIF Authentication API 2.0 patterns; the XACML
   role split (PEP/PDP/PIP/PAP) without the XACML protocol. Maps 1:1 onto a Microsoft
   landscape (Entra ID as IdP, Azure SAS instead of SigV4).
-- **Abuse-resistant low-threshold access** — the layered anti-automation above; the cat-1
+- **Abuse-resistant low-threshold personal access** — the layered anti-automation above; the cat-1
   flow is aimed at *downloading* a personal copy (`Content-Disposition: attachment`),
   not at online viewing.
 - **Automatic expiry, fast reclassification** — time-bound restrictions are enforced by
@@ -157,8 +156,6 @@ Forged tokens are not a route: every request verifies the signature.
 
 | Risk | Compensation |
 | --- | --- |
-| Misclassification at intake (should be ≥1, marked 0) | periodic verification of the public sphere; explicit publish/unpublish on reclassification |
-| Temporary exposure after reclassification to a stricter category | explicit unpublish; verification detects stragglers |
 | Context token forged or shared | short lifetime, asymmetric signing, scope limits; study-room context bound to network/terminal |
 | Stale attributes after reclassification | explicit store update; store↔sidecar verification; decisions not/briefly cached |
 | Harvesting via the cat-1 route | layered anti-automation (§4); consent per dossier |
@@ -167,8 +164,7 @@ Forged tokens are not a route: every request verifies the signature.
 
 ## 8. Open points
 
-- ES-proxy vs. structural filtering of restricted material (findability of restricted items)
-- Public sphere: per-object ACLs vs. a concentrated public prefix per bucket
+- Need for / appoach to restricting access to metadata, other than not indexing the field or storing it in a not publicly available datatest (like the use of an Elasticsearch proxy for metadata)
 - Shape of the employee token (per archive creator / per document type / free selection)
 - Decentralized user-management coupling for participating municipalities
 - Printing / personal copies in the study room; verification step for the e-mail route

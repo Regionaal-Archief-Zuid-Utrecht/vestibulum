@@ -32,7 +32,7 @@ Twee regels voltooien het beslisbeleid:
 
 ### 2.2 Metadata en vindbaarheid
 
-**[NTB]**
+**[NTB]** — zie §8 punt 1: verdient metadata-bescherming méér dan niet-indexeren/niet-publiek-opslaan (bijvoorbeeld een ES-proxy), dan wel dat beperkt materiaal vindbaar mag zijn?
 
 ### 2.3 Rolverdeling: beslissen en handhaven
 
@@ -144,9 +144,7 @@ De resolver kan worden opgebouwd uit of aansluiten op de bestaande voorziening *
 De resolver vertrouwt **nooit** een context-niveau dat de aanroepende applicatie zelf verzint; anders is de PEP via een leugen te omzeilen. Het context-niveau wordt aangeleverd als een door de authenticatievoorziening ondertekend token:
 
 - **`consented`** — de gebruiker (online bezoeker of studiezaalbezoeker) heeft de voorwaarden voor de persoonlijke kopie geaccepteerd; de instemming geldt per dossier en wordt als zodanig in het token gecodeerd.
-- **`studyroom`** — de aanvraag komt uit de studiezaal-voorziening; er is geen individuele aanmelding. Twee technische varianten (keuze open):
-  1. **Netwerkherkomst (edge-stempel).** De vertrouwde netwerk-hop die de verbinding termineert (load balancer, reverse proxy of ingress) ziet het echte bron-IP en stempelt dat op de doorgestuurde request (bijv. `X-Forwarded-For`), waarbij elke door de client aangeboden waarde wordt overschreven. De resolver vertrouwt die stempel omdat requests uitsluitend via die edge bij hem kunnen komen (netwerkisolatie of mTLS), en vergelijkt het IP met de allowlist van de studiezaal-egress-IP's — RAZU beheert dat subnet zelf, dus die lijst is klein en stabiel. De studiezaal-context zit in deze variant **niet in het token** maar is een eigenschap van de request zelf: het token is overal bruikbaar, de studiezaal-context alleen op het juiste netwerk.
-  2. **Terminalgebonden token.** De sessievoorziening van de studiezaal geeft elke terminal een eigen token met een `studyroom`-claim; de terminal treedt op als aangewezen "gebruiker". Dit werkt ook als de terminals geen vast subnet hebben, en is aanscherpbaar door het token aan het uitgifte-IP te binden (zie IP-binding hieronder).
+- **`studyroom`** — de aanvraag komt uit de studiezaal-voorziening; er is geen individuele aanmelding. **Uitgangspunt is de netwerkherkomst (edge-stempel):** de vertrouwde edge (load balancer/reverse proxy/ingress) overschrijft `X-Forwarded-For` met het echte bron-IP; de resolver vertrouwt die stempel omdat requests uitsluitend via die edge bij hem kunnen komen (netwerkisolatie of mTLS), en vergelijkt het IP met de allowlist van studiezaal-egress-IP's (RAZU beheert dat subnet zelf; de lijst is klein en stabiel). De studiezaal-context zit daarbij **niet in het token** maar is een eigenschap van de request zelf. *Alternatief:* in plaats van een per-request IP-check kan de studiezaal-sessievoorziening ook elke terminal een eigen token met `studyroom`-claim geven (bij provisioning op het studiezaalnetwerk), optioneel gebonden aan het uitgifte-IP (IP-binding, zie hieronder).
 - **`granted`** — de individueel aangemelde gebruiker (geautoriseerde bezoeker of medewerker van een deelnemende organisatie) met de verleende scopes. De scopes staan in het token, ontleend aan het autorisatieregister (§2.3). Omvangrijke verleningen worden als **selectieregel** geformuleerd (op archiefvormer/documenttype) in plaats van als expliciete URI-lijst, zodat het token compact blijft.
 
 **Verwerving van `granted`-context** — twee routes, passend bij de twee soorten `granted` (tijdelijk resp. functiegebonden, zie A.5):
@@ -195,7 +193,7 @@ Beperkingen hebben einddata (requirements §1): AVG-beperkingen 82 jaar na creat
 
 - De categorie is **berekend en vastgelegd** in de RDF-sidecars (per document), inclusief de einddatum van de beperking.
 - Een periodiek (minimaal jaarlijks) proces herclassificeert documenten waarvan de beperking is verlopen (bijv. categorie 2 → 0) en werkt de sidecars, de zoekindex en — bij categorie 0 — de publicatiestatus (§5.2) bij. Daarmee is voldaan aan de eis dat verloop automatisch moet kunnen gebeuren (requirements §1.2.4).
-- Bij herclassificatie naar categorie 0 wordt het object **expliciet gepubliceerd** (§5.2); bij herclassificatie naar een strengere categorie (verzaling, herijking) wordt de publieke status expliciet **ingetrokken**. Het metadata-attribuut alleen is niet voldoende; de publieke status in de opslag moet mee bewegen.
+- Bij herclassificatie naar categorie 0 wordt het object **expliciet gepubliceerd** (§5.2); bij herclassificatie naar een strengere categorie (verzwaring, herijking) wordt de publieke status expliciet **ingetrokken**. Het metadata-attribuut alleen is niet voldoende; de publieke status in de opslag moet mee bewegen.
 
 De eis "aanpassingen binnen een dagdeel effectief" (requirements §1.2.4) wordt gehaald doordat (a) de bron van waarheid de sidecars zijn, (b) herclassificatie een kwestie is van sidecar-, store- en index-update, en (c) de resolver per verzoek beslist tegen de attributenstore (§2.3). De attributenstore wordt bij herclassificatie expliciet bijgewerkt, zodat de "dagdeel"-garantie afhangt van het updateproces en niet van cache-verloop. Beslissingen zelf worden niet of hooguit zeer kort (minuten) gecached, zodat een beleidswijziging direct effect heeft. Onbekende URI's (niet in de store) worden in de steady state eenduidig geweigerd: **Deny** (fail-closed; de store is de enige runtime-bron en elk verzoek landt in het auditlog).
 
@@ -237,7 +235,7 @@ Het ontwerp accepteert bewust risico ten gunste van maximale toegankelijkheid (r
 | Risico | Oorzaak | Compensatie |
 | --- | --- | --- |
 | Verkeerde classificatie bij inname (moet ≥ 1, staat als 0) | classificatie is geen exacte wetenschap; op de openbare route is geen runtime-check | periodieke verificatie (§5.2); expliciete toegangskopie-route; herijking na bezwaar |
-| Tijdelijke blootstelling na verzaling/herijking | publieke objecten blijven leesbaar tot intrekking | herclassificatieproces trekt publicatie expliciet in; verificatie detecteert achterblijvers |
+| Tijdelijke blootstelling na verzwaring/herijking | publieke objecten blijven leesbaar tot intrekking | herclassificatieproces trekt publicatie expliciet in; verificatie detecteert achterblijvers |
 | Context-token vervalst of gedeeld | tokens zijn de zwakste schakel in §3.2 | korte geldigheid, ondertekening door de authenticatievoorziening, beperkte scope; studiezaal-context gebonden aan terminal/netwerk |
 | Verouderde attributen na herclassificatie | attributenstore loopt achter op de sidecars | store-expliciet bijwerken bij herclassificatie (§4); periodieke verificatie vergelijkt store met sidecars; besluiten niet of zeer kort cachen |
 | Misbruik categorie-1-route voor harvesting | de instemmingsroute is laagdrempelig; een harvester kan de legale route (sessie starten, instemmen, ophalen) automatiseren | instemming per dossier; gelaagde anti-automatisering op `/consent` (§A.3): ALTCHA-PoW als eerste drempel, **honeypot-veld** in het formulier (ingevuld → géén instemming, wel logging en het IP op de blocklist), **rate limiting per IP en per sessie** op `/consent` én `/resolve` (plafond op resolves én nieuwe instemmingen), en **IP-blocking** (tijdelijk, of tot handmatige vrijgave) bij honeypot-hit of herhaalde plafond-overschrijding. Het IP komt daarbij uit de edge-stempel (§3.2), nooit uit een client-aangeboden header. Daarnaast anomaliedetectie op het auditlog (patroon: veel sessies met telkens één dossier) met desnoods adaptief zwaardere PoW per IP, en eventueel conditioneel een drempelverhogende stap (e-mail) bij vermoeden van automatisering. Vervalste tokens zijn géén route: de ondertekening door de sessievoorziening wordt per aanroep geverifieerd (§3.2) |
@@ -246,13 +244,13 @@ Het ontwerp accepteert bewust risico ten gunste van maximale toegankelijkheid (r
 
 ## 8. Open punten (NTB)
 
-1. ES-proxy versus structurele filtering (§2.2) — afhankelijk van de vraag of beperkt materiaal vindbaar moet zijn.
+1. Toegang tot metadata beperken: is "niet indexeren / niet publiek opslaan" afdoende, of is een andere aanpak nodig (bijvoorbeeld een ES-proxy voor metadata)? Zie §2.2 en §6 — het hangt af van de vraag of beperkt materiaal vindbaar moet zijn.
 2. Publieke sfeer per-object ACL versus geconcentreerde prefix (§5.2).
 3. Vorm van het medewerkers-token voor deelnemende organisaties: per archiefvormer, per documenttype, of vrije selecties (requirements §1.2.2, NB). De architectuur ondersteunt selectieregels op basis van de archiefvormer- en type-attributen (§2.3, A.5); welke selecties in de praktijk worden verleend, is een beheerkeuze.
 4. Decentrale koppeling voor gebruikersbeheer van deelnemende gemeenten (requirements §1.2.4).
 5. Persoonlijke kopieën in de studiezaal (printen) en handmatige verificatie bij de e-mail-route (requirements §1.2.2, categorie 1).
 6. Rapportage-functionaliteit (requirements §1.2.4) — de resolver-auditlog levert hiervoor de gegevens.
-7. ~~Stapeling versus actor-matrix~~ — **beslist (2026-11-17)**: de stapelingsregel is de norm. Een `granted` bezoeker krijgt toegang tot alles wat voor hem is verleend, uiteraard categorie 0, categorie 1 na instemming, en categorie 2 wanneer hij zich in de studiezaal bevindt. Hoe meer context matcht, hoe meer toegang. De actor-matrix in requirements §1.2.2 beschrijft het typische gebruik per actor (welke voorzieningen nodig zijn om tot een categorie te geraken), niet een verbod op combinaties. De resolver implementeert de stapelende variant (§2.1, A.6).
+7. Stapeling versus actor-matrix — **beslist (2026-11-17)**: de stapelingsregel is de norm. Een `granted` bezoeker krijgt toegang tot alles wat voor hem is verleend, uiteraard categorie 0, categorie 1 na instemming, en categorie 2 wanneer hij zich in de studiezaal bevindt. Hoe meer context matcht, hoe meer toegang. De actor-matrix in requirements §1.2.2 beschrijft het typische gebruik per actor (welke voorzieningen nodig zijn om tot een categorie te geraken), niet een verbod op combinaties. De resolver implementeert de stapelende variant (§2.1, A.6).
 
 ## Bijlage A: de resolver-flow per categorie
 
@@ -394,7 +392,7 @@ De architectuur voegt bewust geen nieuwe technologie toe: alle onderdelen passen
 | Sessievoorziening | **stateless**: alleen sleutelpaar + JWKS-endpoint, géén sessie-/instemmingsregister (instemming leeft in het token) | nee, nog eenvoudiger |
 | Autorisatieregister (`granted`) | Elasticsearch-index met een klein beheerformulier; kan in de bestaande beheeromgeving of als extra endpoints in de FastAPI-dienst | nee, hergebruik |
 
-~~Eén open realisatiekeuze: één FastAPI-dienst of twee~~ — **beslist**: twee hosts (`sessie.razu.nl` / `resolver.razu.nl`, zie §3.2 Deployment). De privésleutel zit op een host die geen resolver-verkeer afhandelt. Ze mogen wél uit één codebase/twee deployment-varianten van dezelfde FastAPI-dienst ontstaan, met interne modulengrenzen (resolver-beslissing, sessie, register).
+Eén open realisatiekeuze (één FastAPI-dienst of twee) — **beslist**: twee hosts (`sessie.razu.nl` / `resolver.razu.nl`, zie §3.2 Deployment). De privésleutel zit op een host die geen resolver-verkeer afhandelt. Ze mogen wél uit één codebase/twee deployment-varianten van dezelfde FastAPI-dienst ontstaan, met interne modulengrenzen (resolver-beslissing, sessie, register).
 
 ### B.1 Gebruikte standaarden
 

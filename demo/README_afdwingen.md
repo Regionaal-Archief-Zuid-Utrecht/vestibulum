@@ -56,4 +56,4 @@ of lokaal met Python ≥ 3.11: `python afdwingen.py` → http://localhost:8000
 - Login/grant zetten een signed cookie in dezelfde browser; in
   productie komt de claim van een echte IdP (OIDC) of het
   beheersysteem.
-- Geen rate-limiting, geen challenge-expiry, geen echte ALTCHA.
+- Geen rate-limiting, geen honeypot, geen IP-blocking, geen challenge-expiry, geen echte ALTCHA (wel in de architectuur, §A.3/§7).

@@ -1,0 +1,2 @@
+# Text files: normalize to LF in the repository, LF in the working tree
+* text=auto eol=lf

@@ -50,6 +50,35 @@ De website (Valeros) en de ondersteunende services (IIIF, PDF, snippet, export) 
 
 Eén nuance bij de eis "één bron van waarheid" (requirements §1.2.4): het ontwerp kent twee registers, elk met een eigen soort feit en een eigen eigenaar — de **RDF-sidecars** voor de toegangsbeperkingen per document (bron van waarheid in de zin van de eis) en het **autorisatieregister** voor verleende `granted`-rechten per gebruiker. Instemmingen (cat 1) worden bewust níét in een register persistent gehouden: zij leven als claim in het kortlevende context-token. Er is geen overlap tussen de registers: geen enkel feit wordt in meer dan één register beheerd. Daarmee blijft de eis overeind in zijn kern: nergens hoeven administraties "in de pas te lopen", want elk feit heeft precies één plek.
 
+**Componentenoverzicht** — de samenhang visueel. Rollen van gebruikers (medewerkers van deelnemende organisaties) kunnen además via een **externe IdP** komen: bij OIDC-login vertaalt de sessievoorziening de IdP-claims via een `claim → scope`-mapping naar `granted`-scopes (§3.2):
+
+```mermaid
+graph LR
+  subgraph Apps["Applicaties (dom)"]
+    V["Valeros web"]
+    I["IIIF · PDF · snippet · export"]
+  end
+  B["Browser"]
+  IdP["Externe IdP (OIDC: Entra ID / Keycloak / SURFconext)"]
+  R["Resolver resolver.razu.nl — PEP + PDP, verifieert JWT via JWKS, presigned URL's"]
+  S["Sessievoorziening sessie.razu.nl — ENIGE houder van de privésleutel, tekent context-tokens, stateless"]
+  A[("Attributenstore — ES-index: categorie, dossier, archiefvormer, bucket/key")]
+  G[("Autorisatieregister — granted-scopes, code-hashes, status")]
+  C[("RDF-sidecars — bron van waarheid voor de beperkingen")]
+  S3[("S3-buckets per archiefvormer — default-deny")]
+  CDN[("CDN — publieke sfeer")]
+  B --> V
+  V --> R
+  I --> R
+  R --> A
+  IdP --> S
+  S --> G
+  C --> A
+  R -. "presigned URL" .-> S3
+  R -. "publieke URI" .-> CDN
+  B --> S
+```
+
 ### 2.4 Records: wat de registers bevatten
 
 **Attributenrecord** (attributenstore, per document) — minimaal:

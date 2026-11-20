@@ -63,6 +63,7 @@ graph LR
     I[IIIF · PDF · snippet · export]
   end
   B[Browser]
+  IdP["External IdP (OIDC: Entra ID / Keycloak / SURFconext)"]
   R["Resolver resolver.razu.nl<br/>PEP + PDP · verifies JWT via JWKS only · presigns URLs"]
   S["Session service sessie.razu.nl<br/>ONLY holder of the private key · issues context tokens<br/>stateless: keypair + JWKS + authorization register"]
   A[("Attribute store<br/>ES index: category, dossier, owner, bucket/key")]
@@ -74,6 +75,7 @@ graph LR
   V --> R
   I --> R
   R --> A
+  IdP --> S
   S --> G
   C --> A
   R -. presigned URL .-> S3

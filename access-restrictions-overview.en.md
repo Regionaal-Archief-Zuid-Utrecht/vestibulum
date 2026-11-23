@@ -5,7 +5,6 @@ Status: design, for discussion · Last update: 2026-11-20
 This is an English summary. The authoritative documents are in Dutch:
 `requirements-toegangsbeperkingen.md` (the *what* and *why*) and
 `architectuur-toegangsbeperkingen.md` (the full architectural elaboration).
-A runnable demo of all four categories lives in `demo/`.
 
 ## 1. The problem
 

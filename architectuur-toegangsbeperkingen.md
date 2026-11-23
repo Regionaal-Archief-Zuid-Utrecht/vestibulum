@@ -1,7 +1,7 @@
 # Architectuur: afdwingen van toegangsbeperkingen RAZU e-depot
 
 Status: ontwerp, ter bespreking
-Laatste update: 2026-11-17
+Laatste update: 2026-11-20
 Requirements: `requirements-toegangsbeperkingen.md` — dit document bevat uitsluitend de architecturale uitwerking; het **wat** en **waarom** (categorieën, actoren, matrix, metadata-beleid, beheer-eisen) staat dáár. Waar het requirements-document nog open vragen bevat, is dat in de tekst gemarkeerd met **[NTB]** (nog te bepalen). Bij onbekende vaktermen: **Bijlage C** bevat een begrippenlijst.
 
 ## 1. Doel en uitgangspunten
@@ -9,8 +9,8 @@ Requirements: `requirements-toegangsbeperkingen.md` — dit document bevat uitsl
 De toegangsvoorziening moet de geldende beperkingen afdwingen over alle routes waarlangs content het e-depot verlaat: web (Valeros), IIIF-tiles, PDF-generatie, snippets en exports. Het ontwerp kent drie randvoorwaarden:
 
 1. **Aansluiting op de bestaande gelaagde architectuur** — hergebruik van bestaande componenten (S3-replica, CDN, SURA, RDF-sidecars als bron van waarheid); geen vervanging van lagen.
-2. **Eenvoud boven complexiteit** — één beslisregel, één uitgiftepunt, geen aparte autorisatie-infrastructuur die de vier categorieën niet nodig hebben.
-3. **Bewust geaccepteerd rest risico** — maximale toegankelijkheid impliceert dat onbedoelde beschikbaarstelling als geaccepteerd risico wordt gedocumenteerd (zie §7).
+2. **Eenvoud boven complexiteit** — de architectuur kiest voor de minst complexe oplossing die aan de requirements voldoet.
+
 
 ## 2. Model
 
@@ -32,7 +32,7 @@ Twee regels voltooien het beslisbeleid:
 
 ### 2.2 Metadata en vindbaarheid
 
-**[NTB]**
+**[NTB]** — zie §8 punt 1: verdient metadata-bescherming méér dan niet-indexeren/niet-publiek-opslaan (bijvoorbeeld een ES-proxy), dan wel dat beperkt materiaal vindbaar mag zijn?
 
 ### 2.3 Rolverdeling: beslissen en handhaven
 
@@ -40,7 +40,7 @@ De architectuur volgt de rolverdeling uit de XACML-referentiearchitectuur (NIST 
 
 - **PEP (Policy Enforcement Point)** — de **resolver**: de voorziening waarlangs afgeschermde documenten (categorie 1–3) worden uitgegeven en waar elke toegangsvraag wordt beslist. Categorie-0-documenten vragen geen besluit: die zijn publiek leesbaar en ook direct via de publieke URI/CDN opvraagbaar — "publiek" ís daar het beleid (§5.2).
 - **Beslislogica (PDP-functie)** — ingebouwd in de resolver, als gedeelde bibliotheek of module. Het beleid is klein (de tabel uit §2.1 plus stapeling en scope) en verdient geen eigen dienst; de logica moet wel op precies één plek geïmplementeerd zijn.
-- **Contextbron: sessie-/autorisatievoorziening** — het component dat sessies en instemmingen administreert en het **context-token opstelt en ondertekent** (asymmetrisch: de resolver controleert met alleen een publieke sleutel en kan zelf geen tokens maken). Zij ondertekent nooit door de aanroeper aangedragen claims, maar uitsluitend wat zij uit vertrouwde bronnen kan vaststellen (§3.2). Bewust een dun component: een sessieregister, een instemmingsregister, een koppeling naar het autorisatieregister en één sleutelpaar.
+- **Contextbron: sessie-/autorisatievoorziening** — het component dat het **context-token opstelt en ondertekent** (asymmetrisch: de resolver controleert met alleen een publieke sleutel en kan zelf geen tokens maken). Zij ondertekent nooit door de aanroeper aangedragen claims, maar uitsluitend wat zij uit vertrouwde bronnen kan vaststellen (§3.2). Bewust een dun, **stateless** component: géén sessie- of instemmingsregister — alleen een koppeling naar het autorisatieregister en één sleutelpaar. Instemmingen (cat 1) leven uitsluitend in het kortlevende context-token en vervallen mee met het token (hernieuwde instemming na tokenverloop is acceptabel, zie requirements §1.2.2).
 - **Autorisatieregister** — de administratie van verleende `granted`-toegangen (tijdelijk dan wel functiegebonden; zie A.5). Gevuld door beheerprocessen (archivaris, deelnemende organisaties), gelezen door de sessie-/autorisatievoorziening, door niemand anders gemuteerd. Record-opbouw en levenscyclus: §2.4.
 - **Attribuutbronnen (PIP-rol)** — de bron van waarheid voor de categorie en einddatum per document blijft de RDF-sidecar, maar op de request-path bevraagt de resolver deze niet direct via SPARQL. In plaats daarvan wordt per document een attributenrecord **gematerialiseerd in een snelle attributenstore** (een eenvoudige database of een per-document entry in de bestaande Elasticsearch-index), gevoed door het inname- en herclassificatieproces (§4). De record-inhoud staat in §2.4; het context-niveau van de gebruiker komt uit de sessie-/autorisatievoorziening (§3.2).
 - **PAP-rol (beheer van de regels)** — de beperkingen zelf (type, termijn, einddatum) worden in de RDF-sidecars vastgelegd door de archivaris en vertaald naar categorieën via de versiebeheerde mappingtabel in het classificatieproces; dat is de "policy administration"-kant. Zie §4 en §6.
@@ -48,7 +48,36 @@ De architectuur volgt de rolverdeling uit de XACML-referentiearchitectuur (NIST 
 
 De website (Valeros) en de ondersteunende services (IIIF, PDF, snippet, export) zijn 'dom': zij vragen elk document uitsluitend via de resolver aan en handhaven zelf niets.
 
-Eén nuance bij de eis "één bron van waarheid" (requirements §1.2.4): het ontwerp kent drie registers, maar elk registreert een eigen soort feit met een eigen eigenaar — de **RDF-sidecars** voor de toegangsbeperkingen per document (bron van waarheid in de zin van de eis), het **instemmingsregister** (deel van de sessievoorziening) voor de actuele instemmingen per sessie, en het **autorisatieregister** voor verleende rechten per gebruiker. Er is geen overlap tussen de drie: geen enkel feit wordt in meer dan één register beheerd. Daarmee blijft de eis overeind in zijn kern: nergens hoeven administraties "in de pas te lopen", want elk feit heeft precies één plek.
+Eén nuance bij de eis "één bron van waarheid" (requirements §1.2.4): het ontwerp kent twee registers, elk met een eigen soort feit en een eigen eigenaar — de **RDF-sidecars** voor de toegangsbeperkingen per document (bron van waarheid in de zin van de eis) en het **autorisatieregister** voor verleende `granted`-rechten per gebruiker. Instemmingen (cat 1) worden bewust níét in een register persistent gehouden: zij leven als claim in het kortlevende context-token. Er is geen overlap tussen de registers: geen enkel feit wordt in meer dan één register beheerd. Daarmee blijft de eis overeind in zijn kern: nergens hoeven administraties "in de pas te lopen", want elk feit heeft precies één plek.
+
+**Componentenoverzicht** — de samenhang visueel. Rollen van gebruikers (medewerkers van deelnemende organisaties) kunnen además via een **externe IdP** komen: bij OIDC-login vertaalt de sessievoorziening de IdP-claims via een `claim → scope`-mapping naar `granted`-scopes (§3.2):
+
+```mermaid
+graph LR
+  subgraph Apps["Applicaties (dom)"]
+    V["Valeros web"]
+    I["IIIF · PDF · snippet · export"]
+  end
+  B["Browser"]
+  IdP["Externe IdP (OIDC: Entra ID / Keycloak / SURFconext)"]
+  R["Resolver resolver.razu.nl — PEP + PDP, verifieert JWT via JWKS, presigned URL's"]
+  S["Sessievoorziening sessie.razu.nl — ENIGE houder van de privésleutel, tekent context-tokens, stateless"]
+  A[("Attributenstore — ES-index: categorie, dossier, archiefvormer, bucket/key")]
+  G[("Autorisatieregister — granted-scopes, code-hashes, status")]
+  C[("RDF-sidecars — bron van waarheid voor de beperkingen")]
+  S3[("S3-buckets per archiefvormer — default-deny")]
+  CDN[("CDN — publieke sfeer")]
+  B --> V
+  V --> R
+  I --> R
+  R --> A
+  IdP --> S
+  S --> G
+  C --> A
+  R -. "presigned URL" .-> S3
+  R -. "publieke URI" .-> CDN
+  B --> S
+```
 
 ### 2.4 Records: wat de registers bevatten
 
@@ -105,7 +134,7 @@ Consequenties:
 
 - De **persistente URI blijft de access-key**: ook afgeschermde documenten worden via hun datalaag-URI aangesproken (requirements §1.2.1), alleen langs de resolver, die de vereiste authenticatie-/autorisatiestap afdwingt.
 - **Alle uitgiftekanalen lopen langs hetzelfde chokepoint**: webweergave, IIIF-tiles, PDF-generatie, snippets en export gebruiken identiek dezelfde route. Er is geen route die "hoopt" dat een object public read is.
-- **Eén auditlog**: elk verzoek aan elk document van elke applicatie passeert de resolver en wordt gelogd (wie, welk document, welk context-niveau, welk besluit, wanneer).
+- **Eén auditlog**: elk verzoek aan elk document van elke applicatie passeert de resolver en wordt gelogd — minimaal IP (edge-stempel), tijdstip, basiscategorie, besluit en route; URI en context-samenvatting alleen in het uitgebreide log (§A.1).
 - **Eén plek voor beleidswijziging**: een nieuw context-niveau of een aangepaste matrix betekent alleen een aanpassing van de resolver.
 
 De resolver kan worden opgebouwd uit of aansluiten op de bestaande voorziening **SURA**, die al URI's naar URL's kan vertalen. De JWT-mogelijkheid van SURA voor het CDN blijft in dit ontwerp **ongebruikt**: kale opslag-URI's van publieke documenten moeten zonder token blijven werken, en handhaving na uitgifte is voor categorie 1–3 geregeld met presigned URL's op S3. Dit ontwerp maakt SURA tot het natuurlijke fundament van de resolver: URI → besluit → URL.
@@ -115,15 +144,13 @@ De resolver kan worden opgebouwd uit of aansluiten op de bestaande voorziening *
 De resolver vertrouwt **nooit** een context-niveau dat de aanroepende applicatie zelf verzint; anders is de PEP via een leugen te omzeilen. Het context-niveau wordt aangeleverd als een door de authenticatievoorziening ondertekend token:
 
 - **`consented`** — de gebruiker (online bezoeker of studiezaalbezoeker) heeft de voorwaarden voor de persoonlijke kopie geaccepteerd; de instemming geldt per dossier en wordt als zodanig in het token gecodeerd.
-- **`studyroom`** — de aanvraag komt uit de studiezaal-voorziening; er is geen individuele aanmelding. Twee technische varianten (keuze open):
-  1. **Netwerkherkomst (edge-stempel).** De vertrouwde netwerk-hop die de verbinding termineert (load balancer, reverse proxy of ingress) ziet het echte bron-IP en stempelt dat op de doorgestuurde request (bijv. `X-Forwarded-For`), waarbij elke door de client aangeboden waarde wordt overschreven. De resolver vertrouwt die stempel omdat requests uitsluitend via die edge bij hem kunnen komen (netwerkisolatie of mTLS), en vergelijkt het IP met de allowlist van de studiezaal-egress-IP's — RAZU beheert dat subnet zelf, dus die lijst is klein en stabiel. De studiezaal-context zit in deze variant **niet in het token** maar is een eigenschap van de request zelf: het token is overal bruikbaar, de studiezaal-context alleen op het juiste netwerk.
-  2. **Terminalgebonden token.** De sessievoorziening van de studiezaal geeft elke terminal een eigen token met een `studyroom`-claim; de terminal treedt op als aangewezen "gebruiker". Dit werkt ook als de terminals geen vast subnet hebben, en is aanscherpbaar door het token aan het uitgifte-IP te binden (zie IP-binding hieronder).
+- **`studyroom`** — de aanvraag komt uit de studiezaal-voorziening; er is geen individuele aanmelding. **Uitgangspunt is de netwerkherkomst (edge-stempel):** de vertrouwde edge (load balancer/reverse proxy/ingress) overschrijft `X-Forwarded-For` met het echte bron-IP; de resolver vertrouwt die stempel omdat requests uitsluitend via die edge bij hem kunnen komen (netwerkisolatie of mTLS), en vergelijkt het IP met de allowlist van studiezaal-egress-IP's (RAZU beheert dat subnet zelf; de lijst is klein en stabiel). De studiezaal-context zit daarbij **niet in het token** maar is een eigenschap van de request zelf. *Alternatief:* in plaats van een per-request IP-check kan de studiezaal-sessievoorziening ook elke terminal een eigen token met `studyroom`-claim geven (bij provisioning op het studiezaalnetwerk), optioneel gebonden aan het uitgifte-IP (IP-binding, zie hieronder).
 - **`granted`** — de individueel aangemelde gebruiker (geautoriseerde bezoeker of medewerker van een deelnemende organisatie) met de verleende scopes. De scopes staan in het token, ontleend aan het autorisatieregister (§2.3). Omvangrijke verleningen worden als **selectieregel** geformuleerd (op archiefvormer/documenttype) in plaats van als expliciete URI-lijst, zodat het token compact blijft.
 
 **Verwerving van `granted`-context** — twee routes, passend bij de twee soorten `granted` (tijdelijk resp. functiegebonden, zie A.5):
 
 1. **SSO via de eigen organisatie** (functiegebonden, de hoofdroute). De gebruiker kiest "inloggen via organisatie" en wordt doorgestuurd naar de eigen IdP (OIDC: Entra ID, Keycloak, SURFconext of eigen provider). De IdP levert na authenticatie een ondertekend ID-token met claims; de sessievoorziening vertaalt die via een `claim → scope`-mapping naar `granted`-scopes en stelt daarop het context-token op. RAZU beheert hiervoor **geen accounts of wachtwoorden**: alleen trust-configuratie (`iss` → publieke sleutels per IdP) plus de mapping. De organisatie beheert zelf wie haar medewerkers zijn en welke claims ze krijgen — inclusief intrekking bij uitdiensttreding of functiewissel.
-2. **Grant-credential** (tijdelijk, incidenteel). Voor gebruikers zonder deelnemende IdP: de archivaris keurt de aanvraag goed, legt de scope + einddatum vast in het autorisatieregister en de aanvrager krijgt een **eenmalige inwisselcode** (per brief/e-mail of fysiek), bij voorkeur als link naar een inwisselpagina (`/inwisselen`, code in body of fragment — niet als op zichzelf werkende query-parameter, vanwege log- en referer-lekken en mailscanner-prefetching). Het inwisselen levert twee dingen op: het **reguliere context-token/cookie** met de `granted`-claim (kort geldig, zoals alle tokens) én een **refresh-credential**: een `HttpOnly`-cookie dat host-only op `sessie.razu.nl` staat (het reist dus nooit naar de resolver mee) met `Max-Age` = einddatum van de verlening. De code vervalt bij het eerste gebruik; er is géén e-depot-account of user-database.
+2. **Grant-credential** (tijdelijk, incidenteel). Voor gebruikers zonder deelnemende IdP: de archivaris keurt de aanvraag goed, legt de scope + einddatum vast in het autorisatieregister en de aanvrager krijgt een **eenmalige inwisselcode** (per brief/e-mail of fysiek), bij voorkeur als link naar een inwisselpagina (`/inwisselen`, code in body of fragment — niet als op zichzelf werkende query-parameter, vanwege log- en referer-lekken en mailscanner-prefetching). Het inwisselen levert twee dingen op: het **reguliere context-token/cookie** met de `granted`-claim (kort geldig, zoals alle tokens) én een **refresh-credential**: een `HttpOnly`-cookie dat host-only op `sessie.razu.nl` staat (het reist dus nooit naar de resolver mee) met `Max-Age` = einddatum van de verlening; de waarde van het refresh-credential is een door sessie ondertekende JWT met de grant-referentie (`code_hash`), zodat `/sessie/refresh` stateless werkt — zonder sessieregister. De code vervalt bij het eerste gebruik; er is géén e-depot-account of user-database.
 
 **Levensduur en intrekking.** De verlening is langdurig, het context-token bewust kort (uren). Verloopt het token, dan vernieuwt de applicatie het **silent** via `/sessie/refresh` met de refresh-credential — de sessievoorziening leest daarbij het register opnieuw. Daarmee gelden twee eigenschappen tegelijk: de gebruiker merkt niets van verloop (geen herhaald inwisselen) én **intrekking werkt binnen de token-levensduur door** (de volgende refresh faalt; het register is de bron). Verliest de gebruiker de refresh-credential (nieuw apparaat, gewiste cookies), dan kan via de bekende afleverroute een nieuwe eenmalige code worden uitgegeven — ook die controleert het register.
 
@@ -142,6 +169,8 @@ Aanbeveling: **cookie voor de webapplicatie, `Authorization`-header voor machine
 - `resolver.razu.nl` — de PEP: verifieert tokens met de **publieke** sleutel, beslist, geeft presigned URL's. Bevat geen tekenmateriaal — compromittering levert geen token-fabriek op.
 
 Gevolgen van twee hosts: de cookie krijgt `Domain=razu.nl` (hij moet naar beide hosts; dit is een first-party-cookie, geen third-party-blokkade, maar wel meereizend naar elke `*.razu.nl`-host — bewust breder dan host-only), en viewer-fetches naar `resolver.razu.nl` zijn cross-origin: CORS met `Access-Control-Allow-Credentials` op de resolver en `credentials: "include"` aan de client-kant. `SameSite=Lax` volstaat: subdomeinen onder dezelfde eTLD+1 zijn "same-site". Interne netwerk-scheiding tussen de hosts is aanbevolen (resolver mag sessie-endpoints niet kunnen aanroepen in naam van gebruikers).
+
+**Sessie-bootstrap** — bij elke paginalaad roept de browser `GET https://sessie.razu.nl/sessie/context` aan met `credentials: "include"` (vanuit Valeros-JS, niet vanuit de Valeros-backend: die kan de HttpOnly-cookie niet lezen en kan hem dus niet doorsturen). De sessievoorziening bepaalt zelf of er een nieuwe cookie moet worden gezet: (a) geldig token → geen `Set-Cookie`, alleen de context-claims als JSON in de response-body (wél leesbaar voor JS, in tegenstelling tot het cookie zelf); (b) verlopen token met refresh-credential → stil hernieuwen (`granted`-claims opnieuw ophalen uit het autorisatieregister; de refresh-credential is een signed JWT met de grant-referentie) + `Set-Cookie`; `consented`-claims vervallen mee met het token — na verloop stemt de gebruiker in dat geval opnieuw in; (c) geen of ongeldig token → nieuwe anonieme sessie met lege context + `Set-Cookie: context=...; HttpOnly; Secure; SameSite=Lax; Domain=razu.nl`. De `Set-Cookie`-header in het response is wat het cookie in de browser plant; daarna stuurt de browser het bij élke request naar élke `*.razu.nl`-host automatisch mee als `Cookie`-header — zonder dat JavaScript het ooit kan lezen.
 
 **IP-binding van het token** — optionele aanscherping: de sessievoorziening kan het client-IP bij uitgifte in het token opnemen, zodat de resolver de edge-stempel met de gebonden waarde vergelijkt en een gestolen token elders onbruikbaar is. Dat past bij vaste endpoints (studiezaalterminals hebben een vast IP) maar **niet** bij `consented`- en `granted`-tokens van gewone gebruikers: die wisselen van netwerk (thuis, mobiel, wisselend NAT-IP) en zouden bij elke IP-wijziging opnieuw moeten uitgeven. IP-binding is dus selectief toepasbaar — voor terminals zinvol, voor eindgebruikers niet.
 
@@ -164,9 +193,11 @@ Beperkingen hebben einddata (requirements §1): AVG-beperkingen 82 jaar na creat
 
 - De categorie is **berekend en vastgelegd** in de RDF-sidecars (per document), inclusief de einddatum van de beperking.
 - Een periodiek (minimaal jaarlijks) proces herclassificeert documenten waarvan de beperking is verlopen (bijv. categorie 2 → 0) en werkt de sidecars, de zoekindex en — bij categorie 0 — de publicatiestatus (§5.2) bij. Daarmee is voldaan aan de eis dat verloop automatisch moet kunnen gebeuren (requirements §1.2.4).
-- Bij herclassificatie naar categorie 0 wordt het object **expliciet gepubliceerd** (§5.2); bij herclassificatie naar een strengere categorie (verzaling, herijking) wordt de publieke status expliciet **ingetrokken**. Het metadata-attribuut alleen is niet voldoende; de publieke status in de opslag moet mee bewegen.
+- Bij herclassificatie naar categorie 0 wordt het object **expliciet gepubliceerd** (§5.2); bij herclassificatie naar een strengere categorie (verzwaring, herijking) wordt de publieke status expliciet **ingetrokken**. Het metadata-attribuut alleen is niet voldoende; de publieke status in de opslag moet mee bewegen.
 
-De eis "aanpassingen binnen een dagdeel effectief" (requirements §1.2.4) wordt gehaald doordat (a) de bron van waarheid de sidecars zijn, (b) herclassificatie een kwestie is van sidecar-, store- en index-update, en (c) de resolver per verzoek beslist tegen de attributenstore (§2.3). De attributenstore wordt bij herclassificatie expliciet bijgewerkt, zodat de "dagdeel"-garantie afhangt van het updateproces en niet van cache-verloop. Beslissingen zelf worden niet of hooguit zeer kort (minuten) gecached, zodat een beleidswijziging direct effect heeft. Onbekende URI's (niet in de store) worden eenduidig geweigerd: Deny.
+De eis "aanpassingen binnen een dagdeel effectief" (requirements §1.2.4) wordt gehaald doordat (a) de bron van waarheid de sidecars zijn, (b) herclassificatie een kwestie is van sidecar-, store- en index-update, en (c) de resolver per verzoek beslist tegen de attributenstore (§2.3). De attributenstore wordt bij herclassificatie expliciet bijgewerkt, zodat de "dagdeel"-garantie afhangt van het updateproces en niet van cache-verloop. Beslissingen zelf worden niet of hooguit zeer kort (minuten) gecached, zodat een beleidswijziging direct effect heeft. Onbekende URI's (niet in de store) worden in de steady state eenduidig geweigerd: **Deny** (fail-closed; de store is de enige runtime-bron en elk verzoek landt in het auditlog).
+
+**Migratiefase (optioneel).** Tijdens de uitrol mag SURA al als resolver-base dienen zónder gevulde attributenstore, mits §5.1/§5.2 onverkort gelden (buckets default-deny; alleen expliciet gepubliceerde cat-0-objecten publiek leesbaar). Voor een onbekende URI mag de resolver dan de publieke CDN-URI teruggeven in plaats van Deny — S3 weigert de bytes voor cat 1–3 op objectniveau alsnog. Deze fallback is een expliciete, tijdelijke configuratie; zodra de attributenstore als authoritatief wordt gedeclareerd, gaat de default terug naar Deny. Cat 1–3 via presigned URL vereisen hoe dan ook de store.
 
 ## 5. Opslag en de publieke sfeer
 
@@ -204,22 +235,22 @@ Het ontwerp accepteert bewust risico ten gunste van maximale toegankelijkheid (r
 | Risico | Oorzaak | Compensatie |
 | --- | --- | --- |
 | Verkeerde classificatie bij inname (moet ≥ 1, staat als 0) | classificatie is geen exacte wetenschap; op de openbare route is geen runtime-check | periodieke verificatie (§5.2); expliciete toegangskopie-route; herijking na bezwaar |
-| Tijdelijke blootstelling na verzaling/herijking | publieke objecten blijven leesbaar tot intrekking | herclassificatieproces trekt publicatie expliciet in; verificatie detecteert achterblijvers |
+| Tijdelijke blootstelling na verzwaring/herijking | publieke objecten blijven leesbaar tot intrekking | herclassificatieproces trekt publicatie expliciet in; verificatie detecteert achterblijvers |
 | Context-token vervalst of gedeeld | tokens zijn de zwakste schakel in §3.2 | korte geldigheid, ondertekening door de authenticatievoorziening, beperkte scope; studiezaal-context gebonden aan terminal/netwerk |
 | Verouderde attributen na herclassificatie | attributenstore loopt achter op de sidecars | store-expliciet bijwerken bij herclassificatie (§4); periodieke verificatie vergelijkt store met sidecars; besluiten niet of zeer kort cachen |
-| Misbruik categorie-1-route voor harvesting | de instemmingsroute is laagdrempelig; een harvester kan de legale route (sessie starten, instemmen, ophalen) automatiseren | instemming per dossier; rate limiting op de resolver (plafond op resolves én nieuwe instemmingen per sessie/IP); anomaliedetectie op het auditlog (patroon: veel sessies met telkens één dossier); eventueel conditioneel een drempelverhogende stap (CAPTCHA/e-mail) bij vermoeden van automatisering. Vervalste tokens zijn géén route: de ondertekening door de sessievoorziening wordt per aanroep geverifieerd (§3.2) |
+| Misbruik categorie-1-route voor harvesting | de instemmingsroute is laagdrempelig; een harvester kan de legale route (sessie starten, instemmen, ophalen) automatiseren | instemming per dossier; gelaagde anti-automatisering op `/consent` (§A.3): ALTCHA-PoW als eerste drempel, **honeypot-veld** in het formulier (ingevuld → géén instemming, wel logging en het IP op de blocklist), **rate limiting per IP en per sessie** op `/consent` én `/resolve` (plafond op resolves én nieuwe instemmingen), en **IP-blocking** (tijdelijk, of tot handmatige vrijgave) bij honeypot-hit of herhaalde plafond-overschrijding. Het IP komt daarbij uit de edge-stempel (§3.2), nooit uit een client-aangeboden header. Daarnaast anomaliedetectie op het auditlog (patroon: veel sessies met telkens één dossier) met desnoods adaptief zwaardere PoW per IP, en eventueel conditioneel een drempelverhogende stap (e-mail) bij vermoeden van automatisering. Vervalste tokens zijn géén route: de ondertekening door de sessievoorziening wordt per aanroep geverifieerd (§3.2) |
 | Resolver als single point of failure | alle uitgifte van categorie 1–3 via één voorziening | hoge beschikbaarheid van een bewust eenvoudige component; publieke route (categorie 0) blijft via CDN ook bij resolver-uitval werken |
-| De auditlog als gegevensverzameling | het log registreert wie welke categorie 1–3-documenten raadpleegt; daarmee is het zelf AVG-gevoelig (§A.1) | bewaartermijn vaststellen, toegang beperken tot beveiliging/rapportage, log meenemen in de privacy-regeling |
+| De auditlog als gegevensverzameling | zelfs het minimale log bevat IP-adressen (persoonsgegevens) bij cat 1–3; het uitgebreide log registreert wie welk document raadpleegt (§A.1) | standaard alleen het minimale log; bewaartermijn vaststellen, toegang beperken tot beveiliging/rapportage, log meenemen in de privacy-regeling | bewaartermijn vaststellen, toegang beperken tot beveiliging/rapportage, log meenemen in de privacy-regeling |
 
 ## 8. Open punten (NTB)
 
-1. ES-proxy versus structurele filtering (§2.2) — afhankelijk van de vraag of beperkt materiaal vindbaar moet zijn.
+1. Toegang tot metadata beperken: is "niet indexeren / niet publiek opslaan" afdoende, of is een andere aanpak nodig (bijvoorbeeld een ES-proxy voor metadata)? Zie §2.2 en §6 — het hangt af van de vraag of beperkt materiaal vindbaar moet zijn.
 2. Publieke sfeer per-object ACL versus geconcentreerde prefix (§5.2).
 3. Vorm van het medewerkers-token voor deelnemende organisaties: per archiefvormer, per documenttype, of vrije selecties (requirements §1.2.2, NB). De architectuur ondersteunt selectieregels op basis van de archiefvormer- en type-attributen (§2.3, A.5); welke selecties in de praktijk worden verleend, is een beheerkeuze.
 4. Decentrale koppeling voor gebruikersbeheer van deelnemende gemeenten (requirements §1.2.4).
 5. Persoonlijke kopieën in de studiezaal (printen) en handmatige verificatie bij de e-mail-route (requirements §1.2.2, categorie 1).
 6. Rapportage-functionaliteit (requirements §1.2.4) — de resolver-auditlog levert hiervoor de gegevens.
-7. ~~Stapeling versus actor-matrix~~ — **beslist (2026-11-17)**: de stapelingsregel is de norm. Een `granted` bezoeker krijgt toegang tot alles wat voor hem is verleend, uiteraard categorie 0, categorie 1 na instemming, en categorie 2 wanneer hij zich in de studiezaal bevindt. Hoe meer context matcht, hoe meer toegang. De actor-matrix in requirements §1.2.2 beschrijft het typische gebruik per actor (welke voorzieningen nodig zijn om tot een categorie te geraken), niet een verbod op combinaties. De resolver implementeert de stapelende variant (§2.1, A.6).
+7. Stapeling versus actor-matrix — **beslist (2026-11-17)**: de stapelingsregel is de norm. Een `granted` bezoeker krijgt toegang tot alles wat voor hem is verleend, uiteraard categorie 0, categorie 1 na instemming, en categorie 2 wanneer hij zich in de studiezaal bevindt. Hoe meer context matcht, hoe meer toegang. De actor-matrix in requirements §1.2.2 beschrijft het typische gebruik per actor (welke voorzieningen nodig zijn om tot een categorie te geraken), niet een verbod op combinaties. De resolver implementeert de stapelende variant (§2.1, A.6).
 
 ## Bijlage A: de resolver-flow per categorie
 
@@ -247,11 +278,16 @@ De mogelijke antwoorden:
 | Permit, categorie 1–3 | redirect naar presigned URL (kort geldig) | document ophalen via S3 |
 | Deny | weigering + `basiscategorie` + `route` | applicatie toont de passende route (§A.3–A.6) |
 
-Elke aanroep wordt gelogd: tijdstip, URI, context-samenvatting, besluit, afgeleverde URL-variant (publiek/presigned). Dit log vormt de basis voor de rapportage-functionaliteit (requirements §1.2.4). **Let op**: het log is zelf een AVG-gevoelige gegevensverzameling — bij categorie 1–3 staat er per definitie vast wie welke mogelijk persoonsgegevens bevattende documenten heeft geraadpleegd. Bewaartermijn, toegangsbeperking en verwerkingsdoel van het log moeten daarom vastgesteld worden (alleen raadplegen voor beveiliging en rapportage), en het log valt daarmee zelf onder de beveiligings- en privacyregeling van het e-depot.
+Elke aanroep wordt gelogd, op twee niveaus:
+
+- **Minimaal log (standaard)** — voor beveiliging en anomaliedetectie (§7): tijdstip, client-IP (uit de edge-stempel, §3.2), basiscategorie, besluit (permit/deny), route. Hier is géén document-URI en géén gebruikersidentiteit in opgenomen.
+- **Uitgebreid log (optioneel)** — alleen als rapportage dat eist (requirements §1.2.4, open punt §8.6): además de URI en context-samenvatting (wie welk document).
+
+**Let op**: het log is zelf een AVG-gevoelige gegevensverzameling. Al in het minimale log is het IP een persoonsgegeven en staat vast welk adres cat 1–3 heeft geraadpleegd; in het uitgebreide log staat per definitie vast wie welke mogelijk persoonsgegevens bevattende documenten heeft geraadpleegd. Bewaartermijn, toegangsbeperking en verwerkingsdoel van het log moeten daarom vastgesteld worden (raadplegen alleen voor beveiliging en rapportage), en het log valt daarmee zelf onder de beveiligings- en privacyregeling van het e-depot. De standaard is daarom het minimale log; het uitgebreide log alleen na expliciete AVG-toetsing van het rapportage-doel.
 
 Performance-aandachtspunt: één pagina-weergave via IIIF kan tientallen resolve-aanroepen betekenen (tiles). De resolver is daarmee een hot path voor categorie 1–3, óók omdat presigned URL's maar kort geldig zijn. Tegengestelde maatregelen (naar keuze, meerdere mogelijk): de beslissen-cache uit §4 ook voor uitgifte toepassen, de presigned URL geldig per object houden zolang de beslissing gecached is, of per pagina/sessie één afgegeven URL hergebruiken. De architectuur schrijft geen keuze voor, maar de component moet op dit gebruik ontworpen worden.
 
-De beslisvolgorde is in alle gevallen: (1) attributenrecord ophalen uit de attributenstore (categorie, einddatum, dossier-URI, voorwaarden-verwijzing, opslaglocatie, vereiste context); (2) context-token verifiëren en uitlezen; (3) beslisregels toepassen (tabel §2.1, stapeling, scope); (4) antwoorden. Als de URI niet in de store staat: Deny.
+De beslisvolgorde is in alle gevallen: (1) attributenrecord ophalen uit de attributenstore (categorie, einddatum, dossier-URI, voorwaarden-verwijzing, opslaglocatie, vereiste context); (2) context-token verifiëren en uitlezen; (3) beslisregels toepassen (tabel §2.1, stapeling, scope); (4) antwoorden. Als de URI niet in de store staat: Deny (migratiefase: publieke CDN-URI, zie §4).
 
 ### A.2 Categorie 0: publiek toegankelijk
 
@@ -273,17 +309,35 @@ Eerste poging:
 
 Instemming (verantwoordelijkheid applicatielaag, resolver niet betrokken):
 
-4. De applicatie toont de voorwaarden voor de persoonlijke kopie en vraagt bevestiging.
-5. Na instemming registreert de sessievoorziening dit en voegt aan het context-token toe: `{type: consented, dossier: ..., at: ...}`. De instemming geldt per dossier en dekt alle categorie-1-documenten van dat dossier.
-6. De applicatie herhaalt het verzoek met het bijgewerkte token.
+4. De applicatie toont de voorwaarden voor de persoonlijke kopie — opgehaald via de voorwaarden-verwijzing uit het Deny-antwoord; de tekst zelf staat centraal (§2.4) — met een vinkje en het ALTCHA-widget (`<altcha-widget challengeurl="https://sessie.razu.nl/altcha">`). De widget rendert op de applicatiepagina, maar het **uitgeven van de challenge** (`GET sessie.razu.nl/altcha`) én het **verifiëren van de oplossing** gebeuren bij de sessievoorziening: het handhavingspunt zit daarmee op het endpoint dat de instemming registreert, niet op de pagina. Een kale POST zonder geldige oplossing krijgt 403. Het formulier bevat además een **honeypot-veld** — voor mensen onzichtbaar (verborgen via CSS, `tabindex="-1"`, `autocomplete="off"`); een bot die alle velden invult verraadt zichzelf daarmee.
+
+5. Bij bevestiging post de browser rechtstreeks naar de sessievoorziening:
+
+   ```
+   POST sessie.razu.nl/consent
+   Cookie: context=<signed token, evt. lege context>
+
+   { "dossier": "https://data.razu.nl/dossier/bouw-1",
+     "accept": true,
+     "terms_version": "vk-2026.1",
+     "altcha": "<oplossing>" }
+   ```
+
+   De POST bevat **niet de tekst van de voorwaarden**, alleen de versie-ID — de tekst zou een door de client aangeleverde claim zijn die de server niet vertrouwt. Vóór het tekenen checkt de sessievoorziening: (a) handtekening, `exp`, `iss`/`aud` van het binnenkomende token (een anonieme bezoeker heeft een token met lege context, §A.1; ongeldig → nieuwe sessie en de flow start opnieuw), (b) `accept === true` expliciet — alles anders telt als géén instemming, (c) `terms_version` is de huidig geldige versie voor dat dossier volgens het eigen, centraal beheerde voorwaarden-register, (d) de ALTCHA-oplossing is geldig voor een zelf-uitgegeven challenge. Daarnaast: CSRF-bescherming (SameSite-cookie + CSRF-token op de POST) en een gelaagd pakket anti-automatisering op `/consent` (rationale in §7): **honeypot-veld**, **rate limiting per IP en per sessie**, en **IP-blocking** bij honeypot-hit of plafond-overschrijding.
+
+6. Na instemming tekent de sessievoorziening een nieuw context-token met `{type: consented, dossier: ..., terms_version: ..., at: ...}`. Er is **geen instemmingsregister**: de instemming leeft uitsluitend in dit token, geldt per dossier en dekt alle categorie-1-documenten van dat dossier.
+
+7. De applicatie herhaalt het verzoek met het bijgewerkte token.
 
 Uitgifte:
 
-7. Resolver: categorie 1, `consented` aanwezig voor een scope waarvan de dossier-URI van het document deel uitmaakt → **Permit**. De scope-check doet de resolver zelf, op basis van de dossier-URI in het attributenrecord; de applicatie kan die claim niet in de hand doen.
-8. Antwoord: redirect naar een **presigned URL**, kort geldig (minuten, voldoende voor download of reeks tiles).
-9. Gebruiker downloadt. Weigering, instemming en uitgifte zijn alle drie gelogd.
+8. Resolver: categorie 1, `consented` aanwezig voor een scope waarvan de dossier-URI van het document deel uitmaakt → **Permit**. De scope-check doet de resolver zelf, op basis van de dossier-URI in het attributenrecord; de applicatie kan die claim niet in de hand doen.
 
-Randvoorwaarden: geldigheidsduur van de instemming (voorstel: sessie of maximaal enkele uren, daarna opnieuw bevestigen) en rate limiting op de resolver tegen geautomatiseerde harvesting langs deze route. **[NTB]** Of er een verificatiestap nodig is (e-mail of handmatig) staat in requirements §1.2.2 nog open; de architectuur werkt met én zonder.
+9. Antwoord: redirect naar een **presigned URL**, kort geldig (minuten), met `Content-Disposition: attachment` — het primaire doel van categorie 1 is de **download** van de persoonlijke kopie; online bekijken in de viewer is secundair.
+
+10. Gebruiker downloadt. Weigering, instemming en uitgifte zijn alle drie gelogd.
+
+Randvoorwaarden: de instemming is aan het token gebonden en vervalt bij tokenverloop (tokenduur: ordegrootte een uur) — daarna opnieuw instemmen, wat bewust acceptabel is (requirements §1.2.2). Verder rate limiting op de resolver tegen geautomatiseerde harvesting langs deze route. **[NTB]** Of er een verificatiestap nodig is (e-mail of handmatig) staat in requirements §1.2.2 nog open; de architectuur werkt met én zonder.
 
 ### A.4 Categorie 2: studiezaal
 
@@ -304,7 +358,20 @@ Voor de anonieme context geldt een extra zorgvuldigheid: omdat de terminal de "g
 Bijzonderheden uit §2.1 die hier spelen:
 
 - **Scope-specificiteit**: de resolver checkt de genoemde scope tegen de dossier-/document-URI én de archiefvormer/type-attributen uit het attributenrecord. Een scope kan een expliciete opsomming zijn (document- of dossier-URI's) of een selectieregel ("alles van archiefvormer Bunnik", "alle bouwtekeningen van gemeente X"). Een verleende toegang geldt uitsluitend waar de scope daadwerkelijk op slaat.
-- **Binnen-scope versoepeling**: valt binnen een verleende scope een document met basiscategorie 1 of 2, dan beslist de resolver Permit zonder dat een aparte instemming of studiezaalbezoek nodig is — de categorie-3-toegang dekt die documenten.
+
+
+De scope-taal (eigen, klein — XACML is daarvoor niet nodig):
+
+```
+scope    := selector ("," selector)*     # OR over selectors
+selector := "doc:" <URI>                  # los document
+          | "dossier:" <URI>              # heel dossier
+          | "org:" <archiefvormer>        # alle documenten van één archiefvormer
+          | "type:" <documenttype>        # alle documenten van dit type
+          | "org:" <archiefvormer> "+type:" <documenttype>   # AND-combinatie
+```
+
+De resolver matcht elke selector tegen het attributenrecord (document-URI, dossier-URI, archiefvormer, documenttype); een document valt binnen de grant als minstens één selector matcht (OR), binnen één selector geldt AND. Voorbeelden: `dossier:https://data.razu.nl/dossier/bouw-1`, `org:gemeente-houten`, `org:gemeente-houten+type:bouwtekening`.- **Binnen-scope versoepeling**: valt binnen een verleende scope een document met basiscategorie 1 of 2, dan beslist de resolver Permit zonder dat een aparte instemming of studiezaalbezoek nodig is — de categorie-3-toegang dekt die documenten.
 - **Geldigheid (tijdelijk én functiegebonden)**: er zijn twee soorten `granted`, met hetzelfde technische mechanisme maar een andere levenscyclus. *Tijdelijke toegang* (geautoriseerde bezoeker) wordt verleend met een expliciete einddatum en vervalt automatisch. *Functiegebonden toegang* (medewerker van een deelnemende organisatie) kent geen einddatum, maar geldt zolang de functie geldt: het recht eindigt via de joiner/mover/leaver-voorziening van de eigen organisatie (uit dienst, of functiewissel waarbij de selectie niet meer past). In beide gevallen geldt de korte geldigheidsduur van het token: het register is de bron en het token ververst silent tegen het register (§3.2), dus een beëindigd recht werkt binnen de token-levensduur door. De administratie daarvan is buiten scope (requirements §1.2.4), maar architectonisch zijn beide een record in hetzelfde autorisatieregister: gebruiker → scope + geldig-tot (dan wel gekoppeld aan functie) + verleend door.
 
 ### A.6 Stapeling en algemene afhandeling
@@ -322,10 +389,10 @@ De architectuur voegt bewust geen nieuwe technologie toe: alle onderdelen passen
 | Resolver (PEP + beslislogica) | FastAPI-service; presigning via de bestaande S3-provider (`boto3`) | nieuw, klein |
 | Attributenstore | index in de bestaande Elasticsearch; de vulling vanuit de sidecars is een Python-pijplijn die nu ook de zoekindex vult en vult de attributen-index in dezelfde run | nee, hergebruik |
 | Context-token ondertekenen/verifiëren | Authlib (actiever onderhouden dan `python-jose`) in de sessievoorziening; de resolver verifieert met de JWKS-sleutels | library, geen applicatie |
-| Sessie-/instemmingsregister | Elasticsearch-index (of in-memory per FastAPI-worker als sessies kort leven; ES is veiliger) | nee, hergebruik |
+| Sessievoorziening | **stateless**: alleen sleutelpaar + JWKS-endpoint, géén sessie-/instemmingsregister (instemming leeft in het token) | nee, nog eenvoudiger |
 | Autorisatieregister (`granted`) | Elasticsearch-index met een klein beheerformulier; kan in de bestaande beheeromgeving of als extra endpoints in de FastAPI-dienst | nee, hergebruik |
 
-~~Eén open realisatiekeuze: één FastAPI-dienst of twee~~ — **beslist**: twee hosts (`sessie.razu.nl` / `resolver.razu.nl`, zie §3.2 Deployment). De privésleutel zit op een host die geen resolver-verkeer afhandelt. Ze mogen wél uit één codebase/twee deployment-varianten van dezelfde FastAPI-dienst ontstaan, met interne modulengrenzen (resolver-beslissing, sessie, register).
+Eén open realisatiekeuze (één FastAPI-dienst of twee) — **beslist**: twee hosts (`sessie.razu.nl` / `resolver.razu.nl`, zie §3.2 Deployment). De privésleutel zit op een host die geen resolver-verkeer afhandelt. Ze mogen wél uit één codebase/twee deployment-varianten van dezelfde FastAPI-dienst ontstaan, met interne modulengrenzen (resolver-beslissing, sessie, register).
 
 ### B.1 Gebruikte standaarden
 
@@ -340,7 +407,7 @@ De beveiligingskritische formaten en protocollen zijn bewust saaie, gevestigde s
 | IP-herkomst studiezaal | **`X-Forwarded-For`** (de facto) — netter alternatief is RFC 7239 `Forwarded`, maar tooling-dun | alleen vertrouwd omdat de edge client-aangeboden waarden overschrijft en de resolver uitsluitend via de edge bereikbaar is |
 | Presigned URL's | **AWS Signature Version 4** | de S3-provider spreekt het; browser-vriendelijke redirect zonder eigen token-formaat |
 | Cross-origin | **CORS (Fetch-spec)** | `Access-Control-Allow-Credentials` + expliciete origin-allowlist — nooit `*` (combineert niet met credentials) |
-| Anti-automatisering | **ALTCHA** (proof-of-work, open spec) | consent-endpoint; eigen PoW-schema's zijn kwetsbaar voor subtiele fouten (replay, verlopen challenges) |
+| Anti-automatisering | **ALTCHA** (proof-of-work, open spec) | widget op de applicatiepagina (Valeros); challenge-uitgifte én verificatie op het consent-endpoint van `sessie.razu.nl` (§A.3) — een kale POST zonder geldige oplossing wordt geweigerd — aanvulling op, geen vervanging van honeypot + IP-rate-limiting/blocking (§7). Eigen PoW-schema's zijn kwetsbaar voor subtiele fouten (replay, verlopen challenges) |
 | IIIF-toegangspatronen | **IIIF Authentication API 2.0** | beschrijft vrijwel letterlijk dit ontwerp: het "external (IP)"-patroon = de studiezaal-variant, het cookie-patroon = onze token-flow; conforme implementatie geeft gratis interop met gangbare viewers (Mirador, OpenSeadragon) |
 
 **Bewust níet gebruikt** (een keuze, geen omissie): UMA, SAML, XACML als protocol (de XACML-*rolverdeling* hanteren we wel), en OAuth-token-introspection — de resolver verifieert zelfstandig met JWKS-sleutels, zonder terugval naar een intro-spection-endpoint; dat houdt de request-path staatloos en de diensten simpel.
@@ -360,6 +427,8 @@ Losse termen in lekentaal, in volgorde van "wat ze hier doen" in dit ontwerp.
 - **PIP (Policy Information Point)** — waar de beslisfactoren vandaan komen: de attributenstore en de registers.
 - **PAP (Policy Administration Point)** — waar het beleid wordt vastgelegd: de RDF-sidecars en de beheer-/classificatieprocessen.
 - **Contextbron** — wie het bewijs van "wie vraagt" uitgeeft: de sessie-/autorisatievoorziening. XACML benoemt deze rol niet los; het concrete patroon komt uit OAuth/OIDC (de *authorization server*).
+- **XACML (eXtensible Access Control Markup Language)** — de OASIS-standaard voor attribute-based access control; hier als referentiearchitectuur voor de rolverdeling (PEP/PDP/PIP/PAP), niet als geïmplementeerd protocol (bewust níet gebruikt, zie Bijlage B).
+- **NIST SP 800-162** — het NIST-publicatie "Guide to Attribute Based Access Control (ABAC) Definition and Considerations"; de bron van de XACML-rolverdeling die §2.3 volgt.
 
 **Componenten**
 
@@ -385,6 +454,6 @@ Losse termen in lekentaal, in volgorde van "wat ze hier doen" in dit ontwerp.
 
 **Procesbegrippen**
 
-- **Instemming (cat 1)** — dossier-gescopede acceptatie van de voorwaarden; vastgelegd in het instemmingsregister met de terms-versie.
+- **Instemming (cat 1)** — dossier-gescopede acceptatie van de voorwaarden; als claim vastgelegd in het context-token met de terms-versie (géén register); vervalt mee met het token.
 - **Inwisselcode** — eenmalige code voor tijdelijke cat-3-toegang; alleen de hash staat in het register, inwisselen levert context-token + refresh-credential.
 - **Herclassificatie** — de overgang van een documentcategorie (bv. na verloop van een termijn); werkt automatisch door omdat de categorie een attribuut is dat de attributenstore voedt.

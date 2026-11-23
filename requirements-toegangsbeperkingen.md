@@ -1,7 +1,7 @@
 # Requirements: toegangsbeperkingen e-depot
 
 Status: ontwerp, ter bespreking
-Laatste update: 2026-11-17
+Laatste update: 2026-11-20
 
 ## 1. Probleemstelling
 
@@ -72,9 +72,12 @@ Materiaal dat publiek toegankelijk is mag geharvest worden, maar het is nodig om
 ##### 1. Persoonlijke kopie
 Een typisch voorbeeld van een document dat als persoonlijke kopie na instemming met de voorwaarden beschikbaar kan worden gemaakt zijn de bouwtekeningen uit bouwdossiers. Hier gelden mogelijk auteursrechtelijke beperkingen, maar met als uitzondering dat het toegestaan is een kopie te maken voor persoonlijk gebruik, mits deze niet verder gedeeld wordt en bijvoorbeeld ook niet gebruikt wordt om de constructie na te bouwen (zie https://www.kvan.nl/wp-content/uploads/2024/03/315.2-Kennisdocument-Bouwdossiers-KVAN-2024.pdf).
 
+De nadruk ligt op het **downloaden** van de persoonlijke kopie; het online bekijken van het document in de viewer is secundair. Het is daarom acceptable dat herhaalde instemming na verloop van de sessie/token (bijvoorbeeld elk uur) nodig is.
+
 Overigens kunnen bij deze bouwtekeningen ook AVG-gerelateerde beperkingen gelden, maar de aanname is dat dit niet in die mate speelt dat ze het aanleveren van een persoonlijke kopie verhinderen. Dit zal bij de materiaalvoorbereiding (pre-ingest) met de beschikbare middelen geverifieerd moeten worden.
 
 Een veelvoorkomende aanpak bij archiefinstellingen is dat gebruikers, na instemming met de voorwaarden, zich met hun e-mailadres aanmelden en daarna een link krijgen om de documenten te downloaden, al dan niet na handmatige verificatie (?). Van belang is bovenal dat de toegangsroute niet misbruikt kan worden voor grootschalige geautomatiseerde en ongeauthoriseerde harvesting. Een route via e-mail lijkt een geschikte, maar ook niet de meest laagdrempelige aanpak 
+Onder dat misbruik valt nadrukkelijk ook het geautomatiseerd doorlopen van de instemmingsflow door bots (sessie starten → instemmen → downloaden, in een loop). De categorie-1-route moet daarom effectieve anti-automatiseringsmaatregelen bevatten (proof-of-work, honeypot, rate limiting, IP-blocking, anomaliedetectie); de concrete maatregelen zijn uitgewerkt in het architectuurdocument (§A.3, §7).
 
 ##### 2. Toegang via de studiezaal
 Een typisch gebruiksgeval voor toegang via de studiezaal zijn documenten die in verband met beperkingen op auteursrecht of privacy niet publiek toegankelijk zijn, maar wel toegankelijk voor bezoekers in de studiezaal. In de studiezaal hoeven gebruikers zich niet individueel bekend te maken; er kan anoniem gebruik gemaakt worden van een vrij beschikbare terminal (en kunnen daar ook persoonlijke kopieën worden gemaakt via printen?).
@@ -143,3 +146,5 @@ Het laten verlopen van toegangsbeperkingen moet automatisch kunnen gebeuren, min
 De formele administratie van het verleningsproces voor tijdelijke toegang (aanvraagdossiers, besluitvorming, archiefverantwoording) is nu buiten scope. Het register met verleende toegangen dat de toegangsvoorziening bij de raadpleging nodig heeft, is daarentegen essentieel; de aanvraag- en uitgifteflow (verlening via een uitgereikt credential) is uitgewerkt in het architectuurdocument.
 
 Rapportage-functionaliteit?
+
+Daarnaast is signalering op verdacht geautomatiseerd gebruik gewenst: analyse van het resolver-auditlog moet patronen van geautomatiseerde harvesting (veel sessies met telkens één dossier, abnormale request-frequenties) leidend tot een melding, zodat tijdig kan worden ingegrepen (zie architectuur §7).

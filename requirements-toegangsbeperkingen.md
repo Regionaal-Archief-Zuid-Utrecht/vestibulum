@@ -54,7 +54,7 @@ Wenselijk is dat ook documenten die niet publiek toegankelijk zijn via de URI ui
 Wat betreft de toegang tot documenten uit de datalaag voorzien we, te specificeren per document, 4 mogelijke niveaus van toegang:
 
 0. online en publiek toegankelijk (TODO: KB stuff license - explain)
-1. online, maar enkel toegankelijk, via een aangevraagde kopie voor persoonlijk gebruik en na instemming met de voorwaarden
+1. online, maar enkel toegankelijk, via een tijdelijk aangevraagde kopie voor persoonlijk gebruik en na kortlevende, niet-geregistreerde instemming met de voorwaarden
 2. toegankelijk via de voorziening in de RAZU-studiezaal
 3. online, maar enkel toegankelijk voor specifieke gebruikers, na aanmelding
 
@@ -72,11 +72,11 @@ Materiaal dat publiek toegankelijk is mag geharvest worden, maar het is nodig om
 ##### 1. Persoonlijke kopie
 Een typisch voorbeeld van een document dat als persoonlijke kopie na instemming met de voorwaarden beschikbaar kan worden gemaakt zijn de bouwtekeningen uit bouwdossiers. Hier gelden mogelijk auteursrechtelijke beperkingen, maar met als uitzondering dat het toegestaan is een kopie te maken voor persoonlijk gebruik, mits deze niet verder gedeeld wordt en bijvoorbeeld ook niet gebruikt wordt om de constructie na te bouwen (zie https://www.kvan.nl/wp-content/uploads/2024/03/315.2-Kennisdocument-Bouwdossiers-KVAN-2024.pdf).
 
-De nadruk ligt op het **downloaden** van de persoonlijke kopie; het online bekijken van het document in de viewer is secundair. Het is daarom acceptable dat herhaalde instemming na verloop van de sessie/token (bijvoorbeeld elk uur) nodig is.
+De nadruk ligt op het **downloaden** van de persoonlijke kopie; het online bekijken van het document in de viewer is secundair. De toestemming is bewust **tijdelijk en staatloos**: er is geen account, geen instemmingsregister en geen andere blijvende consent-administratie; het bewijs van instemming staat uitsluitend in het kort geldige context-token/cookie. Na verloop (ordegrootte enkele uren) moet de gebruiker opnieuw instemmen.
 
 Overigens kunnen bij deze bouwtekeningen ook AVG-gerelateerde beperkingen gelden, maar de aanname is dat dit niet in die mate speelt dat ze het aanleveren van een persoonlijke kopie verhinderen. Dit zal bij de materiaalvoorbereiding (pre-ingest) met de beschikbare middelen geverifieerd moeten worden.
 
-Een veelvoorkomende aanpak bij archiefinstellingen is dat gebruikers, na instemming met de voorwaarden, zich met hun e-mailadres aanmelden en daarna een link krijgen om de documenten te downloaden, al dan niet na handmatige verificatie (?). Van belang is bovenal dat de toegangsroute niet misbruikt kan worden voor grootschalige geautomatiseerde en ongeauthoriseerde harvesting. Een route via e-mail lijkt een geschikte, maar ook niet de meest laagdrempelige aanpak 
+Een veelvoorkomende aanpak bij archiefinstellingen is dat gebruikers, na instemming met de voorwaarden, zich met hun e-mailadres aanmelden en daarna een link krijgen om de documenten te downloaden, al dan niet na handmatige verificatie (?). De gekozen basisroute voor deze voorziening is registratieloos en lagerdrempeliger: direct instemmen in de browser, zonder e-mailadres, account of blijvende server-side instemmingsregistratie. Van belang is bovenal dat die laagdrempelige route niet misbruikt kan worden voor grootschalige geautomatiseerde en ongeauthoriseerde harvesting.
 Onder dat misbruik valt nadrukkelijk ook het geautomatiseerd doorlopen van de instemmingsflow door bots (sessie starten → instemmen → downloaden, in een loop). De categorie-1-route moet daarom effectieve anti-automatiseringsmaatregelen bevatten (proof-of-work, honeypot, rate limiting, IP-blocking, anomaliedetectie); de concrete maatregelen zijn uitgewerkt in het architectuurdocument (§A.3, §7).
 
 ##### 2. Toegang via de studiezaal
@@ -100,7 +100,7 @@ Een verleende toegang is altijd scope-specifiek: zij geldt uitsluitend voor de d
 
 Bij de categorieën spelen de volgende actoren een rol:
 
-- **Online bezoeker** — gebruikt de publieke zoek- en presentatievoorziening zonder aanmelding; kan wel instemmen met de voorwaarden voor categorie 1; die instemming geldt per dossier.
+- **Online bezoeker** — gebruikt de publieke zoek- en presentatievoorziening zonder aanmelding; kan kort instemmen met de voorwaarden voor categorie 1; die instemming geldt per dossier en wordt niet als instemmingsfeit server-side vastgelegd.
 - **Studiezaalbezoeker** — anonieme gebruiker van een vrij beschikbare terminal in de RAZU-studiezaal; geen individuele aanmelding, maar vereist nog steeds instemming voor toegang tot categorie 1.
 - **Geautoriseerde bezoeker** — individueel aangemelde gebruiker die na verzoek en instemming van de archivaris (tijdelijke) toegang heeft gekregen tot specifieke documenten.
 - **Medewerker deelnemende organisatie** — aangemeld via de eigen organisatie (bijvoorbeeld een gemeente of de lokale brandweer); heeft vanuit zijn functie toegang tot een vastgelegde selectie van documenten.
@@ -130,7 +130,7 @@ Voor bijvoorbeeld bouwdossiers geldt dat ze persoonsgegevens bevatten, specifiek
 
 #### 1.2.4. Beheer / overig
 
-Het instemmen met de voorwaarden voor een persoonlijk kopie heeft betrekking op alle documenten voor het betreffende dossier, binnen de betreffende categorie.
+Het instemmen met de voorwaarden voor een persoonlijk kopie heeft betrekking op alle documenten voor het betreffende dossier, binnen de betreffende categorie. Deze instemming is uitsluitend bewijs van tijdelijke toestemming: hij wordt niet in een register vastgelegd en vervalt met het context-token/cookie; daarna is opnieuw instemmen vereist.
 
 Het verlenen van toegang moet met zo min mogelijke administratieve stappen kunnen gebeuren.
 

@@ -1,6 +1,6 @@
 # Access restrictions in the RAZU e-depot — architecture overview
 
-Status: design, for discussion · Last update: 2026-11-20
+Status: design, for discussion · Last update: 2026-11-27
 
 This is an English summary. The authoritative documents are in Dutch:
 `requirements-toegangsbeperkingen.md` (the *what* and *why*) and
@@ -15,7 +15,7 @@ categories:
 | Cat | Meaning | Required context |
 | --- | --- | --- |
 | 0 | public | none |
-| 1 | personal copy after accepting the terms | `consented` (per dossier) |
+| 1 | personal copy after temporary, unregistered acceptance of the terms | `consented` (per dossier, token-only) |
 | 2 | study room only | `studyroom` |
 | 3 | individually granted access | `granted` (scope-specific) |
 
@@ -44,14 +44,17 @@ sequenceDiagram
   participant S3 as S3
   B->>R: GET /resolve?uri=... (context token, HttpOnly cookie or Bearer)
   R->>A: fetch attribute record (category, dossier, owner, bucket/key)
-  A-->>R: category 1, dossier, ...
-  R-->>B: 403 Deny {category: 1, route: consent, terms-ref}
-  B->>S: POST /consent {dossier, accept: true, terms_version, ALTCHA solution}
-  S-->>B: Set-Cookie: new signed context token with consented claim
-  B->>R: GET /resolve?uri=... (new token)
+  A-->>R: category 1, dossier, terms-ref, ...
+  R-->>B: 403 Deny {category: 1, route: consent_required, dossier, terms-ref}
+  B->>S: POST /consent {dossier, terms_ref, accept: true, ALTCHA, honeypot}
+  S-->>B: 303 downloads page + Set-Cookie: signed context token with consented claim
+  B->>R: GET /resolve?uri=... on each download click
   R-->>B: 302 presigned URL (short-lived, Content-Disposition: attachment)
   B->>S3: GET document (download)
 ```
+
+For concrete end-to-end examples of the cat-1 browser route — direct consent and an
+optional e-mail verification variant — see [`example_flows_cat1.md`](example_flows_cat1.md).
 
 ## 3. Components and trust model
 
@@ -64,9 +67,10 @@ graph LR
   B[Browser]
   IdP["External IdP (OIDC: Entra ID / Keycloak / SURFconext)"]
   R["Resolver resolver.razu.nl<br/>PEP + PDP · verifies JWT via JWKS only · presigns URLs"]
-  S["Session service sessie.razu.nl<br/>ONLY holder of the private key · issues context tokens<br/>stateless: keypair + JWKS + authorization register"]
-  A[("Attribute store<br/>ES index: category, dossier, owner, bucket/key")]
+  S["Session service sessie.razu.nl<br/>ONLY holder of the private key · issues context tokens<br/>stateless: keypair + JWKS + authorization/terms sources"]
+  A[("Attribute store<br/>ES index: category, dossier, terms-ref, owner, bucket/key")]
   G[("Authorization register<br/>granted scopes, code hashes, status")]
+  T[("Terms source<br/>texts, scopes, current versions")]
   C[("RDF sidecars<br/>source of truth for restrictions")]
   S3[("S3 buckets per archive creator<br/>default-deny")]
   CDN[(CDN public sphere)]
@@ -77,6 +81,8 @@ graph LR
   IdP --> S
   S --> G
   C --> A
+  R --> T
+  S --> T
   R -. presigned URL .-> S3
   R -. public URI .-> CDN
   B --> S
@@ -94,10 +100,17 @@ Key properties:
   On page load the browser calls `GET /sessie/context` (`credentials: "include"`); the
   service sets a cookie only when needed and returns the context claims as JSON.
 - **Consent (cat 1)** lives only in the short-lived context token — there is no consent
-  register (re-consent after token expiry, ~1h, is accepted by design). The browser POSTs
-  `{dossier, accept: true, terms_version, ALTCHA solution}` directly to `/consent`; the
-  terms *text* is never posted, only the version ID, checked against the centrally managed
-  current version.
+  register or other server-side consent record (re-consent after token expiry, order of
+  magnitude a few hours, is accepted by design). The browser POSTs
+  `{dossier, terms_ref, accept: true, ALTCHA solution, honeypot}` directly to `/consent`;
+  the terms *version* is not posted. The session service validates that `terms_ref` is in
+  scope for the dossier and still identifies the current version, then stamps the current
+  `terms_version` itself. A stale or inconsistent `terms_ref` is rejected with a fresh
+  `consent_required` response.
+- **Download page** — after consent the session service redirects to a dossier downloads
+  page that repeats the terms and shows the token expiry. It lists all cat-1 files but
+  never pre-renders presigned URLs: every click triggers a fresh resolver call, which may
+  answer with a short-lived presigned URL or `consent_required` after token expiry.
 - **`granted` (cat 3)** via organization SSO (OIDC: Entra ID / Keycloak / SURFconext, with a
   `claim → scope` mapping) or a one-time exchange code. The **refresh credential** is a
   signed JWT cookie, host-only on `sessie.razu.nl` (never travels to the resolver); at
@@ -138,7 +151,8 @@ Forged tokens are not a route: every request verifies the signature.
   place.
 - **Stateless, minimal trust core** — the resolver only verifies signatures; the session
   service is stateless (keypair + JWKS); no session or consent registers; every fact has
-  exactly one owner (RDF sidecars for restrictions, authorization register for grants).
+  exactly one owner (RDF sidecars for restrictions, authorization register for grants,
+  terms source for terms text/version).
 - **No new infrastructure** — FastAPI, Elasticsearch, S3/boto3, JWT/OIDC, ALTCHA, all in the
   existing stack; the existing SURA URI-resolver can serve as the resolver's base.
 - **Boring, established standards only** — JWS/JWT + JWKS, OpenID Connect, SigV4 presigned
@@ -166,5 +180,5 @@ Forged tokens are not a route: every request verifies the signature.
 - Need for / appoach to restricting access to metadata, other than not indexing the field or storing it in a not publicly available datatest (like the use of an Elasticsearch proxy for metadata)
 - Shape of the employee token (per archive creator / per document type / free selection)
 - Decentralized user-management coupling for participating municipalities
-- Printing / personal copies in the study room; verification step for the e-mail route
+- Printing / personal copies in the study room; the normal cat-1 route is registration-free, with e-mail/manual verification only as a possible extra anti-automation barrier
 - Reporting functionality (the data is already in the resolver audit log)

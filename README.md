@@ -14,7 +14,7 @@ Status: design, for discussion (2026-11-27).
 | [`access-restrictions-overview.en.md`](access-restrictions-overview.en.md) | English | A short **summary** of the approach, with diagrams, the strengths of the design, residual risks and open points |
 | [`architectuur-toegangsbeperkingen.md`](architectuur-toegangsbeperkingen.md) | Dutch | The **architecture**: the full elaboration — resolver as PEP/PDP chokepoint, stateless session service (`sessie.razu.nl`) signing context tokens, attribute store, authorization register, central terms source, RDF sidecars as source of truth, storage/public sphere, anti-automation layers, residual risks, per-category flows (Bijlage A), standards (Bijlage B), glossary (Bijlage C) |
 | [`requirements-toegangsbeperkingen.md`](requirements-toegangsbeperkingen.md) | Dutch | The **requirements**: the *what* and *why* — legal bases, the four access categories, the actor matrix, metadata restrictions, management requirements |
-| [`example_flows_cat1.md`](example_flows_cat1.md) | English | **Example flows** for category 1 — direct consent and an optional e-mail verification route, both using the token-only architecture |
+| [`example_flows_cat1.md`](example_flows_cat1.md) | English | **Example flows** for category 1 — direct consent and an optional e-mail verification route, both using the token-only architecture; also available as [rendered wireframes](https://regionaal-archief-zuid-utrecht.github.io/vestibulum/example_flows_cat1.html) |
 
 
 The two Dutch documents are authoritative; the English overview and example flows are supporting documents.

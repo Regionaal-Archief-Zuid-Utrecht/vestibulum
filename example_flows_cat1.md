@@ -1,5 +1,7 @@
 # Category 1 flows
 
+Rendered wireframes: [Cat 1 flows](https://regionaal-archief-zuid-utrecht.github.io/vestibulum/example_flows_cat1.html).
+
 ## Flow A — direct consent (baseline)
 
 1. Anonymous user opens a dossier page that contains cat 1 files. The page is displayed as usual, including previews that are already allowed, and shows a message such as: "Sommige bestanden zijn mogelijk auteursrechtelijk beperkt. U kunt voor persoonlijk gebruik een werkkopie aanvragen [Vraag aan]."
@@ -13,7 +15,7 @@
    The attribute record identifies the document as cat 1 and returns its dossier and `terms_ref`. The resolver answers `Deny/consent_required` with the category, dossier URI and applicable terms text or canonical versioned `terms_ref`.
 3. The application shows the consent form using the terms supplied by the resolver response. It contains:
    - the applicable terms;
-   - a clear statement that permission is temporary (order of a few hours), dossier-scoped and not registered as a consent record;
+   - a clear statement that access to the documents is temporary (order of a few hours) and dossier-scoped, and that no consent record is registered;
    - agree and decline actions;
    - the ALTCHA widget;
    - a hidden honeypot field;
@@ -47,7 +49,7 @@
 6. If valid, the session component stamps the current `terms_version` itself, signs a context token `{consented, dossier, terms_version, exp}`, places it in the `HttpOnly` context cookie and returns `303 See Other` to the dossier downloads page. No consent, account or user record is persisted server-side.
 7. The downloads page:
    - repeats the agreed terms;
-   - states that the permission is temporary and shows the token expiry;
+   - states that access to the documents is temporary and shows the token expiry;
    - lists all cat 1 files of the dossier as downloads;
    - does not pre-render presigned URLs.
 8. Every download click performs a fresh resolver call with the context cookie:
@@ -66,7 +68,7 @@ Use this variant when mailbox verification is wanted as an extra barrier (for ex
 1. Same dossier page and `consent_required` response as Flow A. The form can offer "Verify by e-mail", or the application can require this variant conditionally.
 2. The user enters an e-mail address. The form explains:
    - this is only a verification route, not an account;
-   - the eventual permission is still temporary and dossier-scoped;
+   - the eventual document access is still temporary and dossier-scoped;
    - the address is used only to send the verification message and is not retained as a consent or user record;
    - the user must open the e-mail link and explicitly agree to the terms there.
    The request form keeps ALTCHA, the honeypot field and CSRF protection.
@@ -99,7 +101,7 @@ Use this variant when mailbox verification is wanted as an extra barrier (for ex
    ```
 
    The fragment is not sent to the web server and therefore does not end up in request logs, referer headers or trivial mail-scanner prefetches. The e-mail never contains a context token, a document URL that bypasses the resolver, or a presigned URL.
-5. The user opens the landing page. The page reads the fragment client-side, shows the applicable terms again, repeats that the permission is temporary and not registered, and requires an explicit "I agree" action. A mail scanner or URL prefetch therefore cannot accidentally create consent.
+5. The user opens the landing page. The page reads the fragment client-side, shows the applicable terms again, repeats that document access is temporary and that no consent record is registered, and requires an explicit "I agree" action. A mail scanner or URL prefetch therefore cannot accidentally create consent.
 6. On "I agree", the browser posts the fragment value to the session component:
 
    ```

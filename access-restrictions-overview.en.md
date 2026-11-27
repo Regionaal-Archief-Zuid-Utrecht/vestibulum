@@ -54,7 +54,8 @@ sequenceDiagram
 ```
 
 For concrete end-to-end examples of the cat-1 browser route — direct consent and an
-optional e-mail verification variant — see [`example_flows_cat1.md`](example_flows_cat1.md).
+optional e-mail verification variant — see [`example_flows_cat1.md`](example_flows_cat1.md)
+or the [rendered wireframes](https://regionaal-archief-zuid-utrecht.github.io/vestibulum/example_flows_cat1.html).
 
 ## 3. Components and trust model
 

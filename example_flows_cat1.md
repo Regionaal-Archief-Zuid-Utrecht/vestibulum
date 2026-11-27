@@ -16,12 +16,12 @@ Rendered wireframes: [Cat 1 flows](https://regionaal-archief-zuid-utrecht.github
 3. The application shows the consent form using the terms supplied by the resolver response. It contains:
    - the applicable terms;
    - a clear statement that access to the documents is temporary (order of a few hours) and dossier-scoped, and that no consent record is registered;
-   - agree and decline actions;
+   - "Ik ga akkoord" and "Annuleren" actions;
    - the ALTCHA widget;
    - a hidden honeypot field;
    - a CSRF token.
 
-   Declining closes the form and returns to the normal dossier view.
+   "Annuleren" closes the form and returns to the normal dossier view.
 4. On "I agree", the browser posts directly to the session component:
 
    ```
@@ -63,16 +63,18 @@ Rendered wireframes: [Cat 1 flows](https://regionaal-archief-zuid-utrecht.github
 
 ## Flow B — e-mail verification route
 
-Use this variant when mailbox verification is wanted as an extra barrier (for example conditionally, on suspected automation). It keeps the architecture token-only: e-mail proves mailbox possession, not an account, and the submitted address is not turned into a registration.
+Use this variant when mailbox verification is wanted as an extra barrier (for example conditionally, on suspected automation). It keeps the architecture token-only: e-mail proves mailbox possession, not an account, and the submitted address is not turned into a registration. The user agrees to the terms before the verification link is sent.
 
 1. Same dossier page and `consent_required` response as Flow A. The form can offer "Verify by e-mail", or the application can require this variant conditionally.
-2. The user enters an e-mail address. The form explains:
-   - this is only a verification route, not an account;
-   - the eventual document access is still temporary and dossier-scoped;
-   - the address is used only to send the verification message and is not retained as a consent or user record;
-   - the user must open the e-mail link and explicitly agree to the terms there.
-   The request form keeps ALTCHA, the honeypot field and CSRF protection.
-3. Browser posts directly to the session component:
+2. The application shows a combined consent and e-mail form containing:
+   - the applicable terms;
+   - a clear statement that access to the documents is temporary and dossier-scoped, and that no consent record is registered;
+   - an e-mail address field;
+   - a statement that the address is used only to send the verification message and is not retained as a consent or user record;
+   - "Annuleren" and "Ik ga akkoord" actions;
+   - the ALTCHA widget, a hidden honeypot field and a CSRF token.
+
+   "Annuleren" closes the form and returns to the normal dossier view. On "Ik ga akkoord", the browser posts the consent and e-mail address directly to the session component:
 
    ```
    POST sessie.razu.nl/consent/email/request
@@ -81,14 +83,14 @@ Use this variant when mailbox verification is wanted as an extra barrier (for ex
    { "dossier": "...",
      "terms_ref": "...",
      "email": "...",
+     "accept": true,
      "altcha": "...",
      "csrf": "<form csrf token>",
      "website": "" }
    ```
-
-   The session component validates the existing context token, ALTCHA, honeypot, CSRF, IP/session rate limits, and that `terms_ref` is in scope for the dossier and still current. It does not persist the address.
+3. The session component validates the existing context token, ALTCHA, honeypot, CSRF, IP/session rate limits, explicit `accept`, and that `terms_ref` is in scope for the dossier and still current. It does not persist the address.
 4. If valid, the session component creates a short-lived signed `email_challenge` token (for example 10–15 minutes) containing only:
-   - `purpose: "cat1-email-consent"`
+   - `purpose: "cat1-email-consent-confirm"`
    - `dossier`
    - `terms_ref`
    - `context_token_hash` (binds the challenge to the browser session that requested it)
@@ -101,15 +103,14 @@ Use this variant when mailbox verification is wanted as an extra barrier (for ex
    ```
 
    The fragment is not sent to the web server and therefore does not end up in request logs, referer headers or trivial mail-scanner prefetches. The e-mail never contains a context token, a document URL that bypasses the resolver, or a presigned URL.
-5. The user opens the landing page. The page reads the fragment client-side, shows the applicable terms again, repeats that document access is temporary and that no consent record is registered, and requires an explicit "I agree" action. A mail scanner or URL prefetch therefore cannot accidentally create consent.
-6. On "I agree", the browser posts the fragment value to the session component:
+5. The user opens the landing page. The page reads the fragment client-side, shows the dossier and already-accepted terms for context, and requires an explicit "Verify e-mail address" action. A mail scanner or URL prefetch therefore cannot accidentally activate the consent.
+6. On "Verify e-mail address", the browser posts the fragment value to the session component:
 
    ```
    POST sessie.razu.nl/consent/email/confirm
    Cookie: context=<same signed context token>
 
    { "challenge": "<email_challenge>",
-     "accept": true,
      "csrf": "<form csrf token>",
      "website": "" }
    ```

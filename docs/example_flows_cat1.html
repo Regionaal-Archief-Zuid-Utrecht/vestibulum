@@ -73,7 +73,7 @@
         <div class="w-box">[ ALTCHA-widget ]</div>
         <div class="note">honeypot (verborgen veld "website") · CSRF-token</div>
         <div class="chips" style="justify-content: flex-end; gap:10px">
-          <span class="btn ghost">Wijziging afwijzen</span>
+          <span class="btn ghost">Annuleren</span>
           <span class="btn primary">Ik ga akkoord</span>
         </div>
       </div>
@@ -116,16 +116,22 @@
   </div>
 
   <div class="step">
-    <div class="stepnum">B2 · E-mailadres opgeven</div>
+    <div class="stepnum">B2 · Toestemming + e-mailadres</div>
     <div class="screen">
-      <div class="bar"><span>Verificatie</span><span class="dots">● ● ●</span></div>
+      <div class="bar"><span>Consent + verificatie</span><span class="dots">● ● ●</span></div>
       <div class="content">
-        <div class="lbl">E-mailadres</div>
+        <div class="lbl">Voorwaarden (uit resolver-antwoord)</div>
+        <div class="w-box solid">[ geldende gebruiksvoorwaarden terms_ref ]</div>
+        <div class="callout">Toegang tot de documenten is tijdelijk (enkele uren) en geldt alleen voor dit dossier. Er wordt geen toestemming geregistreerd.</div>
+        <div class="lbl">E-mailadres voor verificatie</div>
         <div class="w-box solid">[ invoerveld e-mail ]</div>
-        <div class="callout">Alleen een verificatieroute, geen account. Adres wordt alleen voor de verificatiemail gebruikt en niet bewaard. Open de link in de mail en ga daar akkoord.</div>
+        <div class="callout">Alleen een verificatieroute, geen account. Adres wordt alleen voor de verificatiemail gebruikt en niet bewaard.</div>
         <div class="w-box">[ ALTCHA-widget ]</div>
-        <div class="note">honeypot · CSRF</div>
-        <div class="chips" style="justify-content: flex-end"><span class="btn primary">Stuur verificatielink</span></div>
+        <div class="note">honeypot · CSRF · akkoord verstuurt de verificatielink</div>
+        <div class="chips" style="justify-content: flex-end; gap:10px">
+          <span class="btn ghost">Annuleren</span>
+          <span class="btn primary">Ik ga akkoord</span>
+        </div>
       </div>
     </div>
   </div>
@@ -144,15 +150,15 @@
   </div>
 
   <div class="step">
-    <div class="stepnum">B4 · Landingspagina in e-mail</div>
+    <div class="stepnum">B4 · E-mailadres verifiëren</div>
     <div class="screen">
       <div class="bar"><span>e-mail-verification</span><span class="dots">● ● ●</span></div>
       <div class="content">
-        <div class="lbl">Voorwaarden (opnieuw getoond)</div>
-        <div class="w-box solid">[ geldende gebruiksvoorwaarden ]</div>
-        <div class="callout">Toegang tot de documenten is tijdelijk; er wordt geen toestemming geregistreerd. Expliciete actie vereist: mailscanners/prefetch kunnen geen toestemming veroorzaken.</div>
+        <div class="lbl">Reeds geaccepteerde voorwaarden</div>
+        <div class="w-box solid">[ dossier + voorwaarden ter context ]</div>
+        <div class="callout">U heeft al ingestemd. Verifieer uw e-mailadres om de downloads te openen. Expliciete actie vereist: mailscanners/prefetch kunnen de toestemming niet activeren.</div>
         <div class="note">challenge uit fragment wordt client-side gelezen · CSRF · honeypot</div>
-        <div class="chips" style="justify-content: flex-end"><span class="btn primary">Ik ga akkoord</span></div>
+        <div class="chips" style="justify-content: flex-end"><span class="btn primary">Verifieer e-mailadres</span></div>
       </div>
     </div>
   </div>
@@ -174,7 +180,7 @@
 </div>
 
 <div class="foot">
-  <b>Onder de schermen:</b> geen extra registratie nodig (challenge is zelf-ondertekend) · browserbinding via context_token_hash aanbevolen · nooit toegang per mail versturen · e-mailadres niet bewaren (alleen mailprovider-logs met vaste retentie).
+  <b>Onder de schermen:</b> instemming vindt in B2 plaats · de e-mail bevestigt alleen mailboxtoegang · geen extra registratie nodig (challenge is zelf-ondertekend) · browserbinding via context_token_hash aanbevolen · nooit toegang per mail versturen · e-mailadres niet bewaren (alleen mailprovider-logs met vaste retentie).
 </div>
 
 </body>

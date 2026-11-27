@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cat 1 flows: wireframes</title>
+<style>
+  :root { font-family: system-ui, sans-serif; color: #333; background: #f0f0ee; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; background: #f0f0ee; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: #666; font-size: 13px; margin-bottom: 24px; }
+  h2 { font-size: 16px; margin: 32px 0 12px; padding-bottom: 6px; border-bottom: 2px solid #999; }
+  .flow { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+  .step { display: flex; flex-direction: column; gap: 8px; }
+  .stepnum { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #777; }
+  /* wireframe screen */
+  .screen { background: #fff; border: 2px solid #555; border-radius: 6px; padding: 0; box-shadow: 3px 3px 0 #ccc; display: flex; flex-direction: column; }
+  .bar { background: #e2e2e2; border-bottom: 2px solid #555; padding: 6px 10px; font-size: 10px; color: #666; display: flex; justify-content: space-between; }
+  .dots { letter-spacing: 2px; }
+  .content { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .w-line { height: 8px; background: #d8d8d8; border-radius: 2px; }
+  .w-line.w40 { width: 40%; } .w-line.w60 { width: 60%; } .w-line.w80 { width: 80%; } .w-line.w100 { width: 100%; }
+  .w-box { border: 1px dashed #999; border-radius: 4px; padding: 8px; font-size: 11px; color: #555; }
+  .w-box.solid { border-style: solid; border-color: #555; }
+  .btn { display: inline-block; border: 1.5px solid #444; border-radius: 4px; padding: 4px 12px; font-size: 11px; background: #fff; width: fit-content; }
+  .btn.primary { background: #444; color: #fff; }
+  .btn.ghost { background: #fff; }
+  .file { display: flex; align-items: center; gap: 8px; border: 1px solid #999; border-radius: 4px; padding: 6px 8px; font-size: 11px; color: #444; justify-content: space-between; }
+  .icon { width: 16px; height: 12px; border: 1.5px solid #444; border-radius: 2px; flex: none; }
+  .note { font-size: 10px; color: #888; line-height: 1.4; }
+  .lbl { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: .5px; }
+  .callout { border: 1px solid #999; background: #f7f7f5; border-radius: 4px; padding: 8px 10px; font-size: 11px; color: #444; }
+  .arrow { align-self: center; font-size: 12px; color: #777; padding: 4px 0; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { font-size: 9px; border: 1px solid #888; border-radius: 999px; padding: 1px 8px; color: #555; }
+  .foot { margin-top: 32px; font-size: 12px; color: #666; border-top: 1px solid #bbb; padding-top: 12px; }
+  .branch { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+</style>
+</head>
+<body>
+
+<h1>Categorie 1: werkkopie aanvragen</h1>
+<div class="sub">Wireframes op basis van example_flows_cat1.md (vestibulum). Simpele schermstijl: grijze vlakken = tekst/placeholder, gestippeld = verplicht keuzeveld.</div>
+
+<h2>Flow A: directe toestemming (baseline)</h2>
+<div class="flow">
+
+  <div class="step">
+    <div class="stepnum">A1 · Dossierpagina</div>
+    <div class="screen">
+      <div class="bar"><span>Gemeentearchief · Dossier</span><span class="dots">● ● ●</span></div>
+      <div class="content">
+        <div class="w-line w60"></div>
+        <div class="w-line w40"></div>
+        <div class="w-box">[ voorbeeldweergave / preview – mag al zichtbaar ]</div>
+        <div class="callout">⚠ Sommige bestanden zijn mogelijk auteursrechtelijk beperkt. U kunt voor persoonlijk gebruik een werkkopie aanvragen.
+          <div style="margin-top:6px"><span class="btn primary">Vraag aan</span></div>
+        </div>
+        <div class="note">Achtergrond: GET resolver.razu.nl/resolve → <b>consent_required</b> (categorie, dossier, terms_ref)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="stepnum">A2 · Toestemmingsformulier</div>
+    <div class="screen">
+      <div class="bar"><span>Consent</span><span class="dots">● ● ●</span></div>
+      <div class="content">
+        <div class="lbl">Voorwaarden (uit resolver-antwoord)</div>
+        <div class="w-box solid">[ geldende gebruiksvoorwaarden terms_ref ]</div>
+        <div class="callout">Toestemming is tijdelijk (enkele uren), geldt alleen voor dit dossier en wordt niet geregistreerd.</div>
+        <div class="w-box">[ ALTCHA-widget ]</div>
+        <div class="note">honeypot (verborgen veld "website") · CSRF-token</div>
+        <div class="chips" style="justify-content: flex-end; gap:10px">
+          <span class="btn ghost">Wijziging afwijzen</span>
+          <span class="btn primary">Ik ga akkoord</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="stepnum">A3 · Downloads-pagina (na 303)</div>
+    <div class="screen">
+      <div class="bar"><span>Downloads · Dossier</span><span class="dots">● ● ●</span></div>
+      <div class="content">
+        <div class="w-box solid">[ akkoord gegane voorwaarden ]</div>
+        <div class="callout">Toestemming tijdelijk · verloopt: <b>[exp-tijd]</b></div>
+        <div class="file"><span>📄 <span class="w-line w60" style="display:inline-block; vertical-align:middle;"></span></span><span class="btn">Download</span></div>
+        <div class="file"><span>📄 <span class="w-line w40" style="display:inline-block; vertical-align:middle;"></span></span><span class="btn">Download</span></div>
+        <div class="file"><span>📄 <span class="w-line w80" style="display:inline-block; vertical-align:middle;"></span></span><span class="btn">Download</span></div>
+        <div class="note">Geen vooringestelde presigned URLs. Elke klik: verse resolver-call met consent-token → korte presigned S3-URL.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<h2>Flow B: e-mailverificatie-route</h2>
+<div class="flow">
+
+  <div class="step">
+    <div class="stepnum">B1 · Dossierpagina (zelfde als A1 )</div>
+    <div class="screen">
+      <div class="bar"><span>Gemeentearchief · Dossier</span><span class="dots">● ● ●</span></div>
+      <div class="content">
+        <div class="w-line w60"></div>
+        <div class="w-box">[ preview ]</div>
+        <div class="callout">⚠ Beperkte bestanden.
+          <div style="margin-top:6px"><span class="btn primary">Vraag aan</span></div>
+        </div>
+        <div class="note">consent_required; form biedt "Verifieer via e-mail" (eventueel alleen bij vermoeden van automatisering).</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="stepnum">B2 · E-mailadres opgeven</div>
+    <div class="screen">
+      <div class="bar"><span>Verificatie</span><span class="dots">● ● ●</span></div>
+      <div class="content">
+        <div class="lbl">E-mailadres</div>
+        <div class="w-box solid">[ invoerveld e-mail ]</div>
+        <div class="callout">Alleen een verificatieroute, geen account. Adres wordt alleen voor de verificatiemail gebruikt en niet bewaard. Open de link in de mail en ga daar akkoord.</div>
+        <div class="w-box">[ ALTCHA-widget ]</div>
+        <div class="note">honeypot · CSRF</div>
+        <div class="chips" style="justify-content: flex-end"><span class="btn primary">Stuur verificatielink</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="stepnum">B3 · E-mail met link</div>
+    <div class="screen">
+      <div class="bar"><span>✉ E-mail</span><span class="dots">● ● ●</span></div>
+      <div class="content">
+        <div class="w-line w40"></div>
+        <div class="w-box solid">Vaste-sjabloon mail met link:<br>
+          viewer.razu.nl/e-mail-verification<b>#challenge=…</b></div>
+        <div class="note">Challenge-token in URL-fragment (10–15 min), gebonden aan browser (context_token_hash). Mail bevat géén context-token, document-URL of presigned URL.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="stepnum">B4 · Landingspagina in e-mail</div>
+    <div class="screen">
+      <div class="bar"><span>e-mail-verification</span><span class="dots">● ● ●</span></div>
+      <div class="content">
+        <div class="lbl">Voorwaarden (opnieuw getoond)</div>
+        <div class="w-box solid">[ geldende gebruiksvoorwaarden ]</div>
+        <div class="callout">Toestemming is tijdelijk en wordt niet geregistreerd. Expliciete actie vereist: mailscanners/prefetch kunnen geen toestemming veroorzaken.</div>
+        <div class="note">challenge uit fragment wordt client-side gelezen · CSRF · honeypot</div>
+        <div class="chips" style="justify-content: flex-end"><span class="btn primary">Ik ga akkoord</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="stepnum">B5 · Downloads-pagina ( zelfde als A3 )</div>
+    <div class="screen">
+      <div class="bar"><span>Downloads · Dossier</span><span class="dots">● ● ●</span></div>
+      <div class="content">
+        <div class="w-box solid">[ akkoord gegane voorwaarden ]</div>
+        <div class="callout">Toestemming tijdelijk · verloopt: <b>[exp-tijd]</b></div>
+        <div class="file"><span>📄 <span class="w-line w60" style="display:inline-block; vertical-align:middle;"></span></span><span class="btn">Download</span></div>
+        <div class="file"><span>📄 <span class="w-line w40" style="display:inline-block; vertical-align:middle;"></span></span><span class="btn">Download</span></div>
+        <div class="note">Zelfde token {consented, dossier, terms_version, exp} in HttpOnly-cookie; per klik verse resolver-call.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="foot">
+  <b>Onder de schermen:</b> geen extra registratie nodig (challenge is zelf-ondertekend) · browserbinding via context_token_hash aanbevolen · nooit toegang per mail versturen · e-mailadres niet bewaren (alleen mailprovider-logs met vaste retentie).
+</div>
+
+</body>
+</html>

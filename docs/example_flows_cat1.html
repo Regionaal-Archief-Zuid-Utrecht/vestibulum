@@ -143,28 +143,14 @@
       <div class="content">
         <div class="w-line w40"></div>
         <div class="w-box solid">Vaste-sjabloon mail met link:<br>
-          viewer.razu.nl/e-mail-verification<b>#challenge=…</b></div>
-        <div class="note">Challenge-token in URL-fragment (10–15 min), gebonden aan browser (context_token_hash). Mail bevat géén context-token, document-URL of presigned URL.</div>
+          viewer.razu.nl/dossier/downloads<b>#challenge=…</b></div>
+        <div class="note">Link opent direct de downloadpagina. De pagina leest de challenge client-side uit het fragment en bevestigt die op de achtergrond via POST /consent/email/confirm. Challenge: 10–15 min, gebonden aan browser via context_token_hash; mail bevat géén context-token of presigned URL.</div>
       </div>
     </div>
   </div>
 
   <div class="step">
-    <div class="stepnum">B4 · E-mailadres verifiëren</div>
-    <div class="screen">
-      <div class="bar"><span>e-mail-verification</span><span class="dots">● ● ●</span></div>
-      <div class="content">
-        <div class="lbl">Reeds geaccepteerde voorwaarden</div>
-        <div class="w-box solid">[ dossier + voorwaarden ter context ]</div>
-        <div class="callout">U heeft al ingestemd. Verifieer uw e-mailadres om de downloads te openen. Expliciete actie vereist: mailscanners/prefetch kunnen de toestemming niet activeren.</div>
-        <div class="note">challenge uit fragment wordt client-side gelezen · CSRF · honeypot</div>
-        <div class="chips" style="justify-content: flex-end"><span class="btn primary">Verifieer e-mailadres</span></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="step">
-    <div class="stepnum">B5 · Downloads-pagina ( zelfde als A3 )</div>
+    <div class="stepnum">B4 · Downloads-pagina (zelfde als A3)</div>
     <div class="screen">
       <div class="bar"><span>Downloads · Dossier</span><span class="dots">● ● ●</span></div>
       <div class="content">

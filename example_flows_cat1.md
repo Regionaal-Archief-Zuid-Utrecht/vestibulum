@@ -96,34 +96,33 @@ Use this variant when mailbox verification is wanted as an extra barrier (for ex
    - `context_token_hash` (binds the challenge to the browser session that requested it)
    - `exp`
 
-   It sends a fixed-template e-mail containing a landing-page URL with the challenge in the fragment:
+   It sends a fixed-template e-mail containing a dossier downloads URL with the challenge in the fragment:
 
    ```
-   https://viewer.razu.nl/e-mail-verification#challenge=<email_challenge>
+   https://viewer.razu.nl/dossier/<dossier>/downloads#challenge=<email_challenge>
    ```
 
    The fragment is not sent to the web server and therefore does not end up in request logs, referer headers or trivial mail-scanner prefetches. The e-mail never contains a context token, a document URL that bypasses the resolver, or a presigned URL.
-5. The user opens the landing page. The page reads the fragment client-side, shows the dossier and already-accepted terms for context, and requires an explicit "Verify e-mail address" action. A mail scanner or URL prefetch therefore cannot accidentally activate the consent.
-6. On "Verify e-mail address", the browser posts the fragment value to the session component:
+5. The user opens the e-mail link and lands directly on the dossier downloads page. While the page loads, it reads the fragment client-side and posts the challenge to the session component:
 
    ```
    POST sessie.razu.nl/consent/email/confirm
    Cookie: context=<same signed context token>
 
    { "challenge": "<email_challenge>",
-     "csrf": "<form csrf token>",
-     "website": "" }
+     "csrf": "<page csrf token>" }
    ```
 
-   The session component verifies:
+   This can show a short verification state, but it is not a separate consent screen.
+6. The session component verifies:
    - challenge signature, purpose and expiry;
    - `context_token_hash` against the current context cookie;
    - `dossier` and `terms_ref` consistency;
    - `terms_ref` is still the current version;
-   - honeypot, CSRF and rate limits.
+   - CSRF and rate limits.
 
    If anything fails, the user is returned to the consent flow. If the terms changed between request and confirmation, the stale `terms_ref` is rejected and the current terms must be shown again.
-7. If valid, the session component stamps the current `terms_version` itself, signs the normal context token `{consented, dossier, terms_version, exp}` into the context cookie and returns `303 See Other` to the dossier downloads page.
+7. If valid, the session component stamps the current `terms_version` itself, signs the normal context token `{consented, dossier, terms_version, exp}` into the context cookie and lets the page continue to the normal downloads view.
 8. The downloads page and per-click resolver behaviour are exactly the same as Flow A.
 
 ### Design consequences and limits
